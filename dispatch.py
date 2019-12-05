@@ -59,18 +59,20 @@ class Command:
         self.docs = kwrgs.get('docs') or {}
 
         self.callback = callback
+        if not callable(self.callback):
+            raise Exception('Command callback needs to be callable')
 
         meta = self.callback.__code__
         self.flagnames = meta.co_varnames[:meta.co_argcount]
         self.name = self.callback.__name__
+        self._cmd_args = []
         self._help, flagdoc = parse_doc(self.callback.__doc__)
         self.flags = self._find_flags(flagdoc)
-        self._cmd_args = []
 
-        if self.shorthands:
-            for s in self.shorthands:
-                if s not in self.flagnames:
-                    raise Exception(f'{s} is not a flag')
+        # checking the Command settings for validity
+        # raises error if there is an invalid setting
+        self._check_flag_settings()
+
 
     def help(self):
         print(self.helptext())
@@ -120,8 +122,20 @@ class Command:
             flags[name] = opt
             if opt.shorthand:
                 flags[opt.shorthand] = opt
-
         return flags
+
+    def _check_flag_settings(self):
+        flagchecks = set()
+        if self.defaults:
+            flagchecks.update(self.defaults.keys())
+        if self.shorthands:
+            flagchecks.update(self.shorthands.keys())
+        if self.docs:
+            flagchecks.update(self.docs.keys())
+        # check all the flags being modified by the command settings
+        for f in flagchecks:
+            if f not in self.flagnames:
+                raise Exception(f'{f} is not a flag')
 
     def _named_flags(self) -> dict:
         return {key: val for key, val in self.iter_named_flags()}
