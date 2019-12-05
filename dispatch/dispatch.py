@@ -61,7 +61,7 @@ class Command:
         '''
         self.callback = callback
         if not callable(self.callback):
-            raise DeveloperLevelException('Command callback needs to be callable')
+            raise DeveloperException('Command callback needs to be callable')
         meta = self.callback.__code__
         self.flagnames = meta.co_varnames[:meta.co_argcount]
 
@@ -102,11 +102,7 @@ class Command:
         if '--help' in argv or '-h' in argv:
             return self.help()
 
-        try:
-            fn_args = self.parse_args(argv)
-        except RequiredFlagException as e:
-            print('Error:', e, '(see --help)', file=sys.stderr)
-            exit(1)
+        fn_args = self.parse_args(argv)
         return self.callback(**fn_args)
 
     def help(self):
@@ -135,7 +131,8 @@ class Command:
         flags = {}
         for name in self.flagnames:
             opt = Option(
-                name, self.callback.__annotations__.get(name),
+                name,
+                self.callback.__annotations__.get(name),
                 shorthand=self.shorthands.get(name),
                 help=self.docs.get(name),
                 value=self.defaults.get(name),
@@ -158,7 +155,7 @@ class Command:
         # check all the flags being modified by the command settings
         for f in flagchecks:
             if f not in self.flagnames:
-                raise DeveloperLevelException(f'{f} is not a flag')
+                raise DeveloperException(f'{f} is not a flag')
 
     def _named_flags(self) -> dict:
         return {key: val for key, val in self.iter_named_flags()}
@@ -178,36 +175,37 @@ class Command:
         args = args[:]
         while args:
             arg = args.pop(0)
-            if '-' not in arg:
+            if arg[0] != '-':
                 self._cmd_args.append(arg)
                 continue
 
-            arg = arg.replace('-', '')
+            arg = arg.lstrip('-')
+
             val = None
             if '=' in arg:
-                hasval = True
                 arg, val = arg.split('=')
+            elif args and args[0][0] != '-':
+                # if the next arg is not a flag then it is the flag val
+                val = args.pop(0)
 
-            if arg not in self.flags:
-                raise UserLevelException("could not find flag '{}'".format(arg))
+            flag = self.flags.get(arg)
+            if not flag:
+                raise UserException("could not find flag '{}'".format(arg))
 
-            flag = self.flags[arg]
-
-            if flag.type is bool:
-                flag.value = True if flag.value is None else not flag.value
-            elif val is not None:
+            if val is not None:
+                # If the flag has been given a value but
+                # has no type (aka. NoneType) then we should
+                # assume it is a string.
                 if flag.type is None.__class__:
                     flag.type = str
-                flag.value = flag.type(val)
-            elif args and args[0][0] != '-':
-                try:
-                    flag.setval(args.pop(0))
-                except ValueError as e:
-                    raise UserLevelException(e)
+                flag.setval(val)
+            elif flag.type is bool:
+                flag.value = True if flag.value is None else not flag.value
+
         func_args = {}
         for name, flag in self.iter_named_flags():
             if flag.value is None and not flag.has_default:
-                raise RequiredFlagException(f"'--{flag.name}' is a required flag")
+                raise RequiredFlagError(f"'--{flag.name}' is a required flag")
             func_args[name] = flag.value
         return func_args
 
@@ -219,7 +217,8 @@ class Option:
     def __init__(self, name, typ, *,
                  shorthand=None, help=None, value=None,
                  hidden=None, has_default=None):
-        self.name = name
+        self.arg_name = name
+        self.name = name.replace('_', '-')
         self.type = typ or bool
         self.shorthand = shorthand
         self.help = help
@@ -307,11 +306,16 @@ def parse_doc(docstr):
         main_doc = '\n'.join([l.strip() for l in docstr[:i].split('\n') if l])
         return main_doc.strip(), _parse_flags_doc(docstr[i:])
 
-class UserLevelException(Exception): pass
 
-class DeveloperLevelException(Exception): pass
+class UserException(Exception):
+    pass
 
-class RequiredFlagException(Exception): pass
+class DeveloperException(Exception):
+    pass
+
+class RequiredFlagError(UserException):
+    pass
+
 
 def _parse_flags_doc(doc: str):
     res = {}

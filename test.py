@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import unittest
-import dispatch
+from dispatch import dispatch
 
 class TestCommand(unittest.TestCase):
     class FlagType:
@@ -113,25 +113,32 @@ class TestCommand(unittest.TestCase):
             :n name: give the program a name
             '''
             self.assertEqual(name, 'joe')
-        fn(['--name', 'joe'])
-        fn(['-n', 'joe'])
-        fn(['--name=joe'])
-        fn(['-n=joe'])
+            return len(fn.flags)
+        r = fn(['--name', 'joe'])
+        self.assertTrue(r == 2)
+        r = fn(['-n', 'joe'])
+        self.assertTrue(r == 2)
+        r = fn(['--name=joe'])
+        self.assertTrue(r == 2)
+        r = fn(['-n=joe'])
+        self.assertTrue(r == 2)
 
     def testCommandSettings(self):
-        @dispatch.command(hidden={'debug', 'verbose'})
+        @dispatch.command(hidden={'debug', 'verbose'}, defaults={'debug': False})
         def f1(debug: bool, verbose: bool):
             ''':v verbose:'''
             exp = self.EMPTY_HELP.format(name='f1')
             got = f1.helptext()
             self.assertEqual(exp, got)
             self.assertTrue(verbose)
+            self.assertTrue(len(f1.hidden) == 2)
+            self.assertTrue(len(f1.defaults) == 1)
             return 76
         val = f1(['-v'])
         self.assertEqual(val, 76)
 
         @dispatch.command(shorthands={'debug': 'd'})
-        def f2(debug: bool):
+        def f2(debug: bool=False):
             self.assertTrue(len(f2.shorthands) == 1)
             self.assertTrue(debug)
             return 'what???'
@@ -183,13 +190,13 @@ class TestOptions(unittest.TestCase):
         @dispatch.command()
         def f(keys: Dict[str, float]):
             pass
-        self.assertRaises(dispatch.UserLevelException, f, ['--keys', '{one:1,two:this is the number two}'])
+        self.assertRaises(ValueError, f, ['--keys', '{one:1,two:this is the number two}'])
 
 
 class TestHelpers(unittest.TestCase):
     def testIsIterable(self):
         from typing import List, Dict, Sequence, Mapping
-        from dispatch import _is_iterable
+        from dispatch.dispatch import _is_iterable
         self.assertTrue(_is_iterable(str))
         self.assertTrue(_is_iterable(list))
         self.assertTrue(_is_iterable(dict))
@@ -208,7 +215,7 @@ class TestHelpers(unittest.TestCase):
         self.assertTrue(_is_iterable([1, 2, 3]))
 
     def testFromTypingModule(self):
-        from dispatch import _from_typing_module
+        from dispatch.dispatch import _from_typing_module
         from typing import List, Sequence, Dict
         self.assertTrue(_from_typing_module(List))
         self.assertTrue(_from_typing_module(Sequence))
