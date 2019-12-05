@@ -1,6 +1,6 @@
 # dispatch
 
-Dispatch a quick and dirty command line interface in python.
+A low information-redundancy cli framework for a quick and dirty way of converting python scripts to a command line tool.
 
 Inspired by [fire](https://github.com/google/python-fire) and [click](https://click.palletsprojects.com/).
 
