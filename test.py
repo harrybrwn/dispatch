@@ -37,6 +37,7 @@ class TestCommand(unittest.TestCase):
     def testDocParsing(self):
         def fn(verbose=False, pi=3.14159, tag: str=''):
             '''fn is a function
+            that has a multi-line description.
 
             :v verbose:
             : pi  : this is the value of pi
@@ -47,7 +48,14 @@ class TestCommand(unittest.TestCase):
             :      t              tag :
 
             '''
+        parsed = dispatch._parse_flags_doc(fn.__doc__)
+        self.assertTrue('verbose' in parsed)
+        self.assertEqual(parsed['verbose']['short'], 'v')
+        self.assertTrue('pi' in parsed)
+        self.assertTrue(parsed['pi']['short'] is None)
+
         cmd = dispatch.Command(fn)
+        self.assertEqual(cmd._help, "fn is a function\nthat has a multi-line description.")
         self.assertEqual(len(cmd.flags), 5)
         self.assertEqual(len(cmd._named_flags()), 3)
         f = cmd.flags['verbose']
@@ -64,6 +72,17 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(cmd.flags['t'].shorthand, 't')
         self.assertEqual(cmd.flags['t'].name, 'tag')
         self.assertEqual(cmd.flags['t'], cmd.flags['tag'])
+
+    def testBadDoc(self):
+        def f1(verbose: bool): pass
+        cmd = dispatch.Command(f1)
+        expected = 'Usage:\n    f1 [options]\n\nOptions:\n        --verbose   \n    -h, --help      Get help.'
+        self.assertEqual(expected, cmd.helptext())
+
+        def f2(): pass
+        cmd = dispatch.Command(f2)
+        expected = 'Usage:\n    f2 [options]\n\nOptions:\n    -h, --help Get help.'
+        self.assertEqual(expected, cmd.helptext())
 
     def testRunCommand(self):
         def fn(name: str):

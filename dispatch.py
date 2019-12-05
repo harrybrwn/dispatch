@@ -19,7 +19,9 @@ import jinja2
 __all__ = ['command']
 
 
-HELP_TMPL = '''{{ main_doc }}
+HELP_TMPL = '''{%- if main_doc -%}
+{{ main_doc }}
+{%- endif -%}
 
 Usage:
     {{ name }} [options]
@@ -36,16 +38,32 @@ Options:
 
 
 class Command:
-    def __init__(self, callback, help_template=HELP_TMPL):
+    def __init__(self, callback, **kwrgs):
+        '''Initialize a Command object
+
+        Args:
+            callback: a function that runs the command
+
+        Keyword Args:
+            doc_help (bool): If True, use the callback __doc__ as the help text
+                             for this command.
+            help_template (str): template used for the help text
+            hidden_flags (list): list of flags that should be hidden
+        '''
         self.callback = callback
         self.name = self.callback.__name__
         self._help, flagdoc = parse_doc(self.callback.__doc__)
-        self.flags = self._parse_flags(flagdoc)
+        self.flags = self._find_flags(flagdoc)
+        self._cmd_args = []
+
         if self.flags:
             self._opts_fmt_len = max([len(f) for f in self.flags.values()])
         else:
             self._opts_fmt_len = 1
-        self._cmd_args = []
+
+        self.help_template = kwrgs.get('help_template') or HELP_TMPL
+        self.hidden_flags = kwrgs.get('hidden_flags') or []
+        self.doc_help = kwrgs.get('doc_help') or False
 
     def helptext(self):
         helpflag = Option('help', bool, help='Get help.')
@@ -54,7 +72,7 @@ class Command:
         allflags = list(self._named_flags().values())
         allflags.append(helpflag)
 
-        tmpl = jinja2.Template(HELP_TMPL)
+        tmpl = jinja2.Template(self.help_template)
         return tmpl.render({
             'main_doc': self._help,
             'name': self.name,
@@ -62,11 +80,12 @@ class Command:
             'flags': allflags,
         })
 
-    def _parse_flags(self, flagdoc):
+    def _find_flags(self, flagdoc):
         meta = self.callback.__code__
         flgnames = meta.co_varnames[:meta.co_argcount]
         if not flgnames:
-            return dict()# there are no flags to find
+            return dict() # there are no flags to find
+
         defaults = {}
         for name, deflt in zip(reversed(flgnames), reversed(self.callback.__defaults__ or [])):
             defaults[name] = deflt
@@ -79,6 +98,8 @@ class Command:
                 opt.help = flagdoc[name]['doc']
             if name in defaults:
                 opt.value = defaults[name]
+            if opt.name in self.hidden_flags:
+                opt.hidden = True
             flags[name] = opt
             if opt.shorthand:
                 flags[opt.shorthand] = opt
@@ -96,6 +117,7 @@ class Command:
         return ret
 
     def parse_args(self, args):
+        args = args[:]
         while args:
             arg = args.pop(0)
             if '-' not in arg:
@@ -119,7 +141,7 @@ class Command:
                 if flag.type is None.__class__:
                     flag.type = str
                 flag.value = flag.type(val)
-            elif args[0][0] != '-':
+            elif args and args[0][0] != '-':
                 flag.value = flag.type(args.pop(0))
 
     def run(self, argv=sys.argv):
@@ -182,11 +204,25 @@ def parse_doc(docstr):
     if docstr is None:
         return '', {}
 
-    lines = docstr.split('\n')
-    main_doc = lines.pop(0).strip()
-    doc = {}
+    docparts = docstr.split('\n\n')
+    if len(docparts) == 1:
+        if ':' in docparts[0]:
+            return '', _parse_flags_doc(docparts[0])
+        else:
+            return docstr.strip(), {}
+    elif len(docparts) < 2:
+        raise Exception('must have two new-lines (\\n\\n) separating command doc from flag docs')
 
-    for line in lines:
+    main_doc = '\n'.join([l.strip() for l in docparts[0].split('\n')])
+    return main_doc, _parse_flags_doc(''.join(docparts[1:]))
+
+
+def _parse_flags_doc(doc: str):
+    res = {}
+    i = doc.index(':')
+    s = doc[i:]
+
+    for line in s.split('\n'):
         line = line.strip()
 
         if not line.startswith(':'):
@@ -200,10 +236,12 @@ def parse_doc(docstr):
         else:
             tmpdoc = ''
         if len(names) == 2:
-            doc[names[1]] = {'doc': tmpdoc, 'short': names[0]}
+            res[names[1]] = {'doc': tmpdoc, 'short': names[0]}
         else:
-            doc[names[0]] = {'doc': tmpdoc, 'short': None}
-    return main_doc, doc
+            res[names[0]] = {'doc': tmpdoc, 'short': None}
+    return res
+
+
 
 def _find_opts(fn) -> list:
     meta = fn.__code__
@@ -232,13 +270,13 @@ def helptext(fn):
             'flags': _find_opts(fn)
         })
 
-def _make_command(fn):
+def _make_command(fn, **kwrgs):
     cmd = Command(fn)
     fn.__dispatch_command__ = cmd
     fn.flags = cmd._named_flags()
     return cmd
 
-def command(hidden_flags: list=None):
+def command(**kwrgs):
     '''Decorator for creating a cli command'''
     def runner(fn):
         cmd = _make_command(fn)
