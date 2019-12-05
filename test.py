@@ -52,9 +52,9 @@ class TestCommand(unittest.TestCase):
             '''
         parsed = dispatch._parse_flags_doc(fn.__doc__)
         self.assertTrue('verbose' in parsed)
-        self.assertEqual(parsed['verbose']['short'], 'v')
+        self.assertEqual(parsed['verbose']['shorthand'], 'v')
         self.assertTrue('pi' in parsed)
-        self.assertTrue(parsed['pi']['short'] is None)
+        self.assertTrue(parsed['pi']['shorthand'] is None)
 
         cmd = dispatch.Command(fn)
         self.assertEqual(cmd._help, "fn is a function\nthat has a multi-line description.")
@@ -71,9 +71,11 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(cmd.flags['tag'].type, str)
         self.assertEqual(cmd.flags['tag'].help, '')
         self.assertEqual(cmd.flags['tag'].shorthand, 't')
+        self.assertEqual(cmd.flags['tag'].value, '')
         self.assertEqual(cmd.flags['t'].shorthand, 't')
         self.assertEqual(cmd.flags['t'].name, 'tag')
         self.assertEqual(cmd.flags['t'], cmd.flags['tag'])
+        self.assertEqual(cmd.flags['t'].value, '')
 
     def testBadDoc(self):
         def f1(verbose: bool): pass

@@ -45,28 +45,45 @@ class Command:
             callback: a function that runs the command
 
         Keyword Args:
+            shorthands (dict): Give the command flags a shorthand use {<flag name>: <shorthand>},
+                               has greater precedence over doc parsing.
+            docs (dict): Give the command flags a doc string use {<flag name>: <help text>}
+                         has greater precedence over doc parsing.
+            defaults (dict): Give the command flags a default value use {<flag name>: <value>}
+                             has greater precedence over doc parsing.
             doc_help (bool): If True, use the callback __doc__ as the help text
                              for this command.
             help_template (str): template used for the help text
             hidden (set):  list of flags that should be hidden
         '''
+        self.callback = callback
+        if not callable(self.callback):
+            raise Exception('Command callback needs to be callable')
+        meta = self.callback.__code__
+        self.flagnames = meta.co_varnames[:meta.co_argcount]
+
+        self.shorthands = {}
+        self.docs = {}
+
+        self.name = self.callback.__name__
+        self._help, flagdoc = parse_doc(self.callback.__doc__)
+        for key, val in flagdoc.items():
+            self.shorthands[key] = val.get('shorthand')
+            self.docs[key] = val.get('doc')
+
+        self.defaults = dict(
+            zip(reversed(self.flagnames),
+                reversed(self.callback.__defaults__ or []))
+        )
+
         self.help_template = kwrgs.get('help_template') or HELP_TMPL
         self.hidden = kwrgs.get('hidden') or set()
         self.doc_help = kwrgs.get('doc_help') or False
 
-        self.defaults = kwrgs.get('defaults')
-        self.shorthands = kwrgs.get('shorthands') or {}
-        self.docs = kwrgs.get('docs') or {}
+        self.shorthands.update(kwrgs.get('shorthands') or {})
+        self.docs.update(kwrgs.get('docs') or {})
+        self.defaults.update(kwrgs.get('defaults') or {})
 
-        self.callback = callback
-        if not callable(self.callback):
-            raise Exception('Command callback needs to be callable')
-
-        meta = self.callback.__code__
-        self.flagnames = meta.co_varnames[:meta.co_argcount]
-        self.name = self.callback.__name__
-        self._cmd_args = []
-        self._help, flagdoc = parse_doc(self.callback.__doc__)
         self.flags = self._find_flags(flagdoc)
 
         # checking the Command settings for validity
@@ -97,28 +114,15 @@ class Command:
         if not self.flagnames:
             return dict() # there are no flags to find
 
-        defaults = {}
-        for name, deflt in zip(reversed(self.flagnames), reversed(self.callback.__defaults__ or [])):
-            defaults[name] = deflt
-
-        if self.defaults:
-            defaults.update(self.defaults)
-
         flags = {}
         for name in self.flagnames:
-            opt = Option(name, self.callback.__annotations__.get(name))
-            if name in self.docs:
-                opt.help = self.docs[name]
-            if name in self.shorthands:
-                opt.shorthand = self.shorthands[name]
-            if name in flagdoc:
-                opt.shorthand = flagdoc[name]['short']
-                opt.help = flagdoc[name]['doc']
-
-            if name in defaults:
-                opt.value = defaults[name]
-            if opt.name in self.hidden:
-                opt.hidden = True
+            opt = Option(
+                name, self.callback.__annotations__.get(name),
+                shorthand=self.shorthands.get(name),
+                help=self.docs.get(name),
+                value=self.defaults.get(name),
+                hidden=True if name in self.hidden else False,
+            )
             flags[name] = opt
             if opt.shorthand:
                 flags[opt.shorthand] = opt
@@ -190,18 +194,20 @@ class Command:
             return self.help()
 
         self.parse_args(argv)
-        return self.callback(**self._callback_args())
+        fnargs = self._callback_args()
+        return self.callback(**fnargs)
 
 
 class Option:
-    def __init__(self, name, typ, *, help=None, value=None):
+    def __init__(self, name, typ, *,
+                 shorthand=None, help=None, value=None, hidden=None):
         self.name = name
         self.type = typ or bool
-        self.shorthand = None
+        self.shorthand = shorthand
         self.help = help
-        self._value = value
+        self.value = value
         self.has_default = value is not None
-        self.hidden = False
+        self.hidden = hidden if hidden is not None else False
 
     @property
     def value(self):
@@ -210,7 +216,8 @@ class Option:
     @value.setter
     def value(self, val):
         self._value = val
-        self.type = val.__class__
+        if val is not None:
+            self.type = val.__class__
 
     def __repr__(self):
         return "{}('{}--{}', {})".format(
@@ -269,9 +276,9 @@ def _parse_flags_doc(doc: str):
         else:
             tmpdoc = ''
         if len(names) == 2:
-            res[names[1]] = {'doc': tmpdoc, 'short': names[0]}
+            res[names[1]] = {'doc': tmpdoc, 'shorthand': names[0]}
         else:
-            res[names[0]] = {'doc': tmpdoc, 'short': None}
+            res[names[0]] = {'doc': tmpdoc, 'shorthand': None}
     return res
 
 
