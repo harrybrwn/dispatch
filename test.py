@@ -8,6 +8,8 @@ class TestCommand(unittest.TestCase):
         def __init(self, name):
             self.name = name
 
+    EMPTY_HELP = expected = 'Usage:\n    {name} [options]\n\nOptions:\n    -h, --help Get help.'
+
     def testCommand(self):
         def fn(arg1, arg2): pass
         cmd = dispatch.Command(fn)
@@ -76,13 +78,13 @@ class TestCommand(unittest.TestCase):
     def testBadDoc(self):
         def f1(verbose: bool): pass
         cmd = dispatch.Command(f1)
-        expected = 'Usage:\n    f1 [options]\n\nOptions:\n        --verbose   \n    -h, --help      Get help.'
+        print('---help---\n', cmd.helptext(), '\n\n\n\n')
+        expected = 'Usage:\n    f1 [options]\n\nOptions:\n        --verbose   \n    -h, --help       Get help.'
         self.assertEqual(expected, cmd.helptext())
 
         def f2(): pass
         cmd = dispatch.Command(f2)
-        expected = 'Usage:\n    f2 [options]\n\nOptions:\n    -h, --help Get help.'
-        self.assertEqual(expected, cmd.helptext())
+        self.assertEqual(self.EMPTY_HELP.format(name='f2'), cmd.helptext())
 
     def testRunCommand(self):
         def fn(name: str):
@@ -96,6 +98,16 @@ class TestCommand(unittest.TestCase):
         cmd.run(['-n', 'joe'])
         cmd.run(['--name=joe'])
         cmd.run(['-n=joe'])
+
+    def testCommandSettings(self):
+        @dispatch.command(hidden_flags=['debug'])
+        def cmd_func(debug: bool):
+            exp = self.EMPTY_HELP.format(name='cmd_func')
+            got = cmd_func.__self__.helptext()
+            # self.assertEqual(exp, got)
+
+            print(got)
+        cmd_func()
 
 
 if __name__ == '__main__':

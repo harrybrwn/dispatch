@@ -50,34 +50,33 @@ class Command:
             help_template (str): template used for the help text
             hidden_flags (list): list of flags that should be hidden
         '''
+        self.help_template = kwrgs.get('help_template') or HELP_TMPL
+        self.hidden_flags = kwrgs.get('hidden_flags') or []
+        self.doc_help = kwrgs.get('doc_help') or False
+
         self.callback = callback
         self.name = self.callback.__name__
         self._help, flagdoc = parse_doc(self.callback.__doc__)
         self.flags = self._find_flags(flagdoc)
         self._cmd_args = []
 
-        if self.flags:
-            self._opts_fmt_len = max([len(f) for f in self.flags.values()])
-        else:
-            self._opts_fmt_len = 1
-
-        self.help_template = kwrgs.get('help_template') or HELP_TMPL
-        self.hidden_flags = kwrgs.get('hidden_flags') or []
-        self.doc_help = kwrgs.get('doc_help') or False
+    def help(self):
+        print(self.helptext())
 
     def helptext(self):
         helpflag = Option('help', bool, help='Get help.')
         helpflag.shorthand = 'h'
 
-        allflags = list(self._named_flags().values())
-        allflags.append(helpflag)
+        flags = self.visible_flags()
+        flags.append(helpflag)
+        fmt_len = max([len(f) for f in flags])
 
         tmpl = jinja2.Template(self.help_template)
         return tmpl.render({
             'main_doc': self._help,
             'name': self.name,
-            'opts_fmt_len': self._opts_fmt_len,
-            'flags': allflags,
+            'opts_fmt_len': fmt_len,
+            'flags': flags,
         })
 
     def _find_flags(self, flagdoc):
@@ -106,15 +105,22 @@ class Command:
 
         return flags
 
-    def _named_flags(self):
-        ret = {}
-        for key, flag in self.flags.items():
-            if len(key) == 1 and flag.name in self.flags:
-                # this is a shorthad and is already in the flag-set
-                # labeled by its full name
+    def _named_flags(self) -> dict:
+        return {key: val for key, val in self.iter_named_flags()}
+
+    def iter_named_flags(self):
+        if not self.flags:
+            return [] # so we dont iterate over None
+        for name, flag in self.flags.items():
+            if len(name) == 1 and flag.name in self.flags:
                 continue
-            ret[key] = flag
-        return ret
+            yield name, flag
+
+    def _callback_args(self) -> dict:
+        return {name: f.value for name, f in self.iter_named_flags()}
+
+    def visible_flags(self) -> list:
+        return [f for _, f in self.iter_named_flags() if not f.hidden]
 
     def parse_args(self, args):
         args = args[:]
@@ -149,15 +155,10 @@ class Command:
             argv = argv[1:]
 
         if '--help' in argv or '-h' in argv:
-            self.help()
-            return
+            return self.help()
 
         self.parse_args(argv)
-        fn_args = {flg.name: flg.value for fname, flg in self._named_flags().items()}
-        return self.callback(**fn_args)
-
-    def help(self):
-        print(self.helptext())
+        return self.callback(**self._callback_args())
 
 
 class Option:
@@ -265,20 +266,16 @@ def helptext(fn):
 
     tmpl = jinja2.Template(HELP_TMPL)
     return tmpl.render({
-            'main_doc': maindoc,
-            'name': fn.__name__,
-            'flags': _find_opts(fn)
-        })
-
-def _make_command(fn, **kwrgs):
-    cmd = Command(fn)
-    fn.__dispatch_command__ = cmd
-    fn.flags = cmd._named_flags()
-    return cmd
+        'main_doc': maindoc,
+        'name': fn.__name__,
+        'flags': _find_opts(fn)
+    })
 
 def command(**kwrgs):
     '''Decorator for creating a cli command'''
     def runner(fn):
-        cmd = _make_command(fn)
+        cmd = Command(fn, **kwrgs)
+        # fn.__dispatch_command__ = cmd
+        # fn.flags = cmd._named_flags()
         return cmd.run
     return runner
