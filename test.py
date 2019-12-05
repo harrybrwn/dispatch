@@ -47,7 +47,7 @@ class TestCommand(unittest.TestCase):
 
 
 
-            :      t              tag :
+            :      t              tag :this is a tag
 
             '''
         parsed = dispatch._parse_flags_doc(fn.__doc__)
@@ -55,6 +55,7 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(parsed['verbose']['shorthand'], 'v')
         self.assertTrue('pi' in parsed)
         self.assertTrue(parsed['pi']['shorthand'] is None)
+        self.assertEqual(parsed['tag']['doc'], "this is a tag")
 
         cmd = dispatch.Command(fn)
         self.assertEqual(cmd._help, "fn is a function\nthat has a multi-line description.")
@@ -69,13 +70,16 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(cmd.flags['pi'].value, 3.14159)
         self.assertEqual(cmd.flags['pi'].help, 'this is the value of pi')
         self.assertEqual(cmd.flags['tag'].type, str)
-        self.assertEqual(cmd.flags['tag'].help, '')
+        self.assertEqual(cmd.flags['tag'].help, 'this is a tag')
         self.assertEqual(cmd.flags['tag'].shorthand, 't')
         self.assertEqual(cmd.flags['tag'].value, '')
-        self.assertEqual(cmd.flags['t'].shorthand, 't')
         self.assertEqual(cmd.flags['t'].name, 'tag')
-        self.assertEqual(cmd.flags['t'], cmd.flags['tag'])
+        self.assertEqual(cmd.flags['t'].type, str)
+        self.assertEqual(cmd.flags['t'].help, 'this is a tag')
+        self.assertEqual(cmd.flags['t'].shorthand, 't')
         self.assertEqual(cmd.flags['t'].value, '')
+        self.assertEqual(cmd.flags['t'], cmd.flags['tag'])
+        self.assertEqual(id(cmd.flags['t']), id(cmd.flags['tag']))
 
     def testBadDoc(self):
         def f1(verbose: bool): pass

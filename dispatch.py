@@ -256,11 +256,9 @@ def parse_doc(docstr):
     main_doc = '\n'.join([l.strip() for l in docparts[0].split('\n')])
     return main_doc, _parse_flags_doc(''.join(docparts[1:]))
 
-
 def _parse_flags_doc(doc: str):
     res = {}
-    i = doc.index(':')
-    s = doc[i:]
+    s = doc[doc.index(':'):]
 
     for line in s.split('\n'):
         line = line.strip()
@@ -275,6 +273,7 @@ def _parse_flags_doc(doc: str):
             tmpdoc = parsed[1].strip()
         else:
             tmpdoc = ''
+
         if len(names) == 2:
             res[names[1]] = {'doc': tmpdoc, 'shorthand': names[0]}
         else:
@@ -282,24 +281,8 @@ def _parse_flags_doc(doc: str):
     return res
 
 
-def _find_opts(fn) -> list:
-    meta = fn.__code__
-    flagnames = meta.co_varnames[:meta.co_argcount]
-    maindoc, flagdoc = parse_doc(fn.__doc__)
-    flags = []
-
-    for name in flagnames:
-        opt = Option(name, fn.__annotations__.get(name))
-        if name in flagdoc:
-            opt.shorthand = flagdoc[name]['short']
-            opt.help = flagdoc[name]['doc']
-        flags.append(opt)
-    return flags
-
-
 def helptext(fn):
     meta = fn.__code__
-
     flagnames = meta.co_varnames[:meta.co_argcount]
     maindoc, flagdoc = parse_doc(fn.__doc__)
 
@@ -307,7 +290,7 @@ def helptext(fn):
     return tmpl.render({
         'main_doc': maindoc,
         'name': fn.__name__,
-        'flags': _find_opts(fn)
+        'flags': Command(fn).visible_flags()
     })
 
 
