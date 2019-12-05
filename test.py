@@ -175,6 +175,16 @@ class TestOptions(unittest.TestCase):
             self.assertTrue(isinstance(k, str))
             self.assertTrue(isinstance(v, int))
 
+    def testBadTypeParsing(self):
+        from typing import Dict
+
+        o = dispatch.Option('outout', Dict[str, float])
+        self.assertRaises(ValueError, o.setval, '{one:1.0,two:2.5,three:the third number,four:4}')
+        @dispatch.command()
+        def f(keys: Dict[str, float]):
+            pass
+        self.assertRaises(dispatch.UserLevelException, f, ['--keys', '{one:1,two:this is the number two}'])
+
 
 class TestHelpers(unittest.TestCase):
     def testIsIterable(self):

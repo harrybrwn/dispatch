@@ -61,7 +61,7 @@ class Command:
         '''
         self.callback = callback
         if not callable(self.callback):
-            raise Exception('Command callback needs to be callable')
+            raise DeveloperLevelException('Command callback needs to be callable')
         meta = self.callback.__code__
         self.flagnames = meta.co_varnames[:meta.co_argcount]
 
@@ -156,7 +156,7 @@ class Command:
         # check all the flags being modified by the command settings
         for f in flagchecks:
             if f not in self.flagnames:
-                raise Exception(f'{f} is not a flag')
+                raise DeveloperLevelException(f'{f} is not a flag')
 
     def _named_flags(self) -> dict:
         return {key: val for key, val in self.iter_named_flags()}
@@ -190,7 +190,7 @@ class Command:
                 arg, val = arg.split('=')
 
             if arg not in self.flags:
-                raise Exception("could not find flag '{}'".format(arg))
+                raise UserLevelException("could not find flag '{}'".format(arg))
 
             flag = self.flags[arg]
 
@@ -201,7 +201,10 @@ class Command:
                     flag.type = str
                 flag.value = flag.type(val)
             elif args and args[0][0] != '-':
-                flag.setval(args.pop(0))
+                try:
+                    flag.setval(args.pop(0))
+                except ValueError as e:
+                    raise UserLevelException(e)
 
     def run(self, argv=sys.argv):
         return self.__call__(argv)
@@ -298,10 +301,14 @@ def parse_doc(docstr):
         else:
             return docstr.strip(), {}
     elif len(docparts) < 2:
-        raise Exception('must have two new-lines (\\n\\n) separating command doc from flag docs')
+        raise UserLevelException('must have two new-lines (\\n\\n) separating command doc from flag docs')
 
     main_doc = '\n'.join([l.strip() for l in docparts[0].split('\n')])
     return main_doc, _parse_flags_doc(''.join(docparts[1:]))
+
+class UserLevelException(Exception): pass
+
+class DeveloperLevelException(Exception): pass
 
 def _parse_flags_doc(doc: str):
     res = {}
