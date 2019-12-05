@@ -8,7 +8,7 @@ class TestCommand(unittest.TestCase):
         def __init(self, name):
             self.name = name
 
-    EMPTY_HELP = expected = 'Usage:\n    {name} [options]\n\nOptions:\n    -h, --help Get help.'
+    EMPTY_HELP = expected = 'Usage:\n    {name} [options]\n\nOptions:\n    -h, --help       Get help.'
 
     def testCommand(self):
         def fn(arg1, arg2): pass
@@ -78,13 +78,16 @@ class TestCommand(unittest.TestCase):
     def testBadDoc(self):
         def f1(verbose: bool): pass
         cmd = dispatch.Command(f1)
-        print('---help---\n', cmd.helptext(), '\n\n\n\n')
-        expected = 'Usage:\n    f1 [options]\n\nOptions:\n        --verbose   \n    -h, --help       Get help.'
+        htext = cmd.helptext()
+        expected = 'Usage:\n    f1 [options]\n\nOptions:\n        --verbose    \n    -h, --help       Get help.'
+        self.assertTrue(htext and len(htext) > 5)
         self.assertEqual(expected, cmd.helptext())
 
         def f2(): pass
         cmd = dispatch.Command(f2)
-        self.assertEqual(self.EMPTY_HELP.format(name='f2'), cmd.helptext())
+        htext = cmd.helptext()
+        self.assertTrue(htext and len(htext) > 5)
+        self.assertEqual(self.EMPTY_HELP.format(name='f2'), htext)
 
     def testRunCommand(self):
         def fn(name: str):
@@ -100,14 +103,19 @@ class TestCommand(unittest.TestCase):
         cmd.run(['-n=joe'])
 
     def testCommandSettings(self):
-        @dispatch.command(hidden_flags=['debug'])
-        def cmd_func(debug: bool):
-            exp = self.EMPTY_HELP.format(name='cmd_func')
-            got = cmd_func.__self__.helptext()
-            # self.assertEqual(exp, got)
+        @dispatch.command(hidden={'debug', 'verbose'})
+        def f1(debug: bool, verbose: bool):
+            ''':v verbose:'''
+            exp = self.EMPTY_HELP.format(name='f1')
+            got = f1.__self__.helptext()
+            self.assertEqual(exp, got)
+            self.assertTrue(verbose)
+        f1(['-v'])
 
-            print(got)
-        cmd_func()
+        @dispatch.command(shorthands={'debug': 'd'})
+        def f2(debug: bool):
+            self.assertTrue(debug)
+        f2(['-d'])
 
 
 if __name__ == '__main__':

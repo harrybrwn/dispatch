@@ -16,7 +16,7 @@ import os.path
 import sys
 import jinja2
 
-__all__ = ['command']
+__all__ = ['Command', 'helptext', 'command']
 
 
 HELP_TMPL = '''{%- if main_doc -%}
@@ -39,8 +39,8 @@ Options:
 
 class Command:
     def __init__(self, callback, **kwrgs):
-        '''Initialize a Command object
-
+        # note: docs are modified at runtime
+        '''
         Args:
             callback: a function that runs the command
 
@@ -48,17 +48,29 @@ class Command:
             doc_help (bool): If True, use the callback __doc__ as the help text
                              for this command.
             help_template (str): template used for the help text
-            hidden_flags (list): list of flags that should be hidden
+            hidden (set):  list of flags that should be hidden
         '''
         self.help_template = kwrgs.get('help_template') or HELP_TMPL
-        self.hidden_flags = kwrgs.get('hidden_flags') or []
+        self.hidden = kwrgs.get('hidden') or set()
         self.doc_help = kwrgs.get('doc_help') or False
 
+        self.defaults = kwrgs.get('defaults')
+        self.shorthands = kwrgs.get('shorthands') or {}
+        self.docs = kwrgs.get('docs') or {}
+
         self.callback = callback
+
+        meta = self.callback.__code__
+        self.flagnames = meta.co_varnames[:meta.co_argcount]
         self.name = self.callback.__name__
         self._help, flagdoc = parse_doc(self.callback.__doc__)
         self.flags = self._find_flags(flagdoc)
         self._cmd_args = []
+
+        if self.shorthands:
+            for s in self.shorthands:
+                if s not in self.flagnames:
+                    raise Exception(f'{s} is not a flag')
 
     def help(self):
         print(self.helptext())
@@ -80,24 +92,30 @@ class Command:
         })
 
     def _find_flags(self, flagdoc):
-        meta = self.callback.__code__
-        flgnames = meta.co_varnames[:meta.co_argcount]
-        if not flgnames:
+        if not self.flagnames:
             return dict() # there are no flags to find
 
         defaults = {}
-        for name, deflt in zip(reversed(flgnames), reversed(self.callback.__defaults__ or [])):
+        for name, deflt in zip(reversed(self.flagnames), reversed(self.callback.__defaults__ or [])):
             defaults[name] = deflt
 
+        if self.defaults:
+            defaults.update(self.defaults)
+
         flags = {}
-        for name in flgnames:
+        for name in self.flagnames:
             opt = Option(name, self.callback.__annotations__.get(name))
+            if name in self.docs:
+                opt.help = self.docs[name]
+            if name in self.shorthands:
+                opt.shorthand = self.shorthands[name]
             if name in flagdoc:
                 opt.shorthand = flagdoc[name]['short']
                 opt.help = flagdoc[name]['doc']
+
             if name in defaults:
                 opt.value = defaults[name]
-            if opt.name in self.hidden_flags:
+            if opt.name in self.hidden:
                 opt.hidden = True
             flags[name] = opt
             if opt.shorthand:
@@ -243,7 +261,6 @@ def _parse_flags_doc(doc: str):
     return res
 
 
-
 def _find_opts(fn) -> list:
     meta = fn.__code__
     flagnames = meta.co_varnames[:meta.co_argcount]
@@ -258,6 +275,7 @@ def _find_opts(fn) -> list:
         flags.append(opt)
     return flags
 
+
 def helptext(fn):
     meta = fn.__code__
 
@@ -271,11 +289,18 @@ def helptext(fn):
         'flags': _find_opts(fn)
     })
 
+
 def command(**kwrgs):
-    '''Decorator for creating a cli command'''
     def runner(fn):
         cmd = Command(fn, **kwrgs)
-        # fn.__dispatch_command__ = cmd
-        # fn.flags = cmd._named_flags()
         return cmd.run
     return runner
+
+
+command.__doc__ = f'''
+    Decrotator that creates a Command
+{Command.__init__.__doc__}'''
+
+Command.__init__.__doc__ = f'''
+    Iinitialze a new Command
+{Command.__init__.__doc__}'''
