@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os.path
 import sys
+from collections.abc import Iterable
+import typing
 import jinja2
 
 __all__ = ['Command', 'helptext', 'command']
@@ -89,6 +90,17 @@ class Command:
         # checking the Command settings for validity
         # raises error if there is an invalid setting
         self._check_flag_settings()
+
+    def __call__(self, argv=sys.argv):
+        if argv is sys.argv:
+            argv = argv[1:]
+        if '--help' in argv or '-h' in argv:
+            return self.help()
+
+        self.parse_args(argv)
+
+        fnargs = self._callback_args()
+        return self.callback(**fnargs)
 
 
     def help(self):
@@ -184,18 +196,10 @@ class Command:
                     flag.type = str
                 flag.value = flag.type(val)
             elif args and args[0][0] != '-':
-                flag.value = flag.type(args.pop(0))
+                flag.setval(args.pop(0))
 
     def run(self, argv=sys.argv):
-        if argv is sys.argv:
-            argv = argv[1:]
-
-        if '--help' in argv or '-h' in argv:
-            return self.help()
-
-        self.parse_args(argv)
-        fnargs = self._callback_args()
-        return self.callback(**fnargs)
+        return self.__call__(argv)
 
 
 class Option:
@@ -218,6 +222,44 @@ class Option:
         self._value = val
         if val is not None:
             self.type = val.__class__
+
+    def setval(self, val):
+        '''
+        setval is meant to be used to set the value of the flag from the
+        cli input and convert it to the flag's type. setval should work
+        when the flag.type is a compound type annotation (see typing package).
+
+        This function is basically a rich type convertion. Any flag types that
+        are part of the typing package will be converted to the python type it
+        represents.
+        '''
+        # TODO: type checking does not work if the annotation is an abstract
+        #       base class.
+
+        if not isinstance(val, str) or self.type is str:
+            # if val is not a string then the type has already been converted
+            self._value = val
+        else:
+            if _is_iterable(self.type) and self.type is not str:
+                val = val.strip('[]{}').split(',')
+
+            if self.type is str:
+                self._value = val
+            elif _from_typing_module(self.type):
+                if len(self.type.__args__) == 1:
+                    inner = self.type.__args__[0]
+                    self._value = self.type.__origin__([inner(v) for v in val])
+                elif len(self.type.__args__) == 2:
+                    key_tp, val_tp = self.type.__args__
+                    vals = []
+                    for vl in val:
+                        k, v = vl.split(':')
+                        pair = key_tp(k), val_tp(v)
+                        vals.append(pair)
+                    self._value = self.type.__origin__(vals)
+            else:
+                self._value = self.type(val)
+
 
     def __repr__(self):
         return "{}('{}--{}', {})".format(
@@ -281,6 +323,17 @@ def _parse_flags_doc(doc: str):
     return res
 
 
+def _from_typing_module(t) -> bool:
+    mod = t.__module__
+    return sys.modules[mod] == typing
+
+
+def _is_iterable(t) -> bool:
+    if _from_typing_module(t):
+        return issubclass(t.__origin__, Iterable)
+    return issubclass(t, Iterable)
+
+
 def helptext(fn):
     meta = fn.__code__
     flagnames = meta.co_varnames[:meta.co_argcount]
@@ -296,8 +349,7 @@ def helptext(fn):
 
 def command(**kwrgs):
     def runner(fn):
-        cmd = Command(fn, **kwrgs)
-        return cmd.run
+        return Command(fn, **kwrgs)
     return runner
 
 
