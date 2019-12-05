@@ -295,16 +295,19 @@ class Option:
             length += 4 # length of '-v, ' if v is the shorthand
         return length
 
-def parse_doc(docstr):
+def parse_doc(docstr: str) -> tuple:
     if docstr is None:
         return '', {}
-    if ':' not in docstr:
-        main_doc = '\n'.join([l.strip() for l in docstr.split('\n') if l])
-        return main_doc.strip(), {}
+    if docstr.count(':') < 2:
+        desc = docstr
+        flags = {}
     else:
         i = docstr.index(':')
-        main_doc = '\n'.join([l.strip() for l in docstr[:i].split('\n') if l])
-        return main_doc.strip(), _parse_flags_doc(docstr[i:])
+        desc = docstr[:i]
+        flags = _parse_flags_doc(docstr[i:])
+
+    doc = '\n'.join([l.strip() for l in desc.split('\n') if l])
+    return doc, flags
 
 
 class UserException(Exception):
@@ -372,6 +375,14 @@ def command(**kwrgs):
     def runner(fn):
         return Command(fn, **kwrgs)
     return runner
+
+
+def handle(fn):
+    try:
+        fn()
+    except UserException as e:
+        print(e, file=sys.stderr)
+        exit(1)
 
 
 command.__doc__ = f'''
