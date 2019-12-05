@@ -22,7 +22,7 @@ __all__ = ['Command', 'helptext', 'command']
 
 HELP_TMPL = '''{%- if main_doc -%}
 {{ main_doc }}
-{%- endif -%}
+{%- endif %}
 
 Usage:
     {{ name }} [options]
