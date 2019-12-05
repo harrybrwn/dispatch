@@ -7,8 +7,8 @@ Inspired by [fire](https://github.com/google/python-fire) and [click](https://cl
 ```python
 import dispatch
 
-@dispatch.command()
-def hello(verbose: bool=False, name: str='none', opt=None):
+@dispatch.command(hidden={'debug'})
+def hello(name: str, verbose: bool=False, debug=False):
     '''Run the 'hello' command line interface.
 
     :v verbose: Run the command verbosly

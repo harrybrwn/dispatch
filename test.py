@@ -101,28 +101,132 @@ class TestCommand(unittest.TestCase):
             :n name: give the program a name
             '''
             self.assertEqual(name, 'joe')
-
         cmd = dispatch.Command(fn)
         cmd.run(['--name', 'joe'])
         cmd.run(['-n', 'joe'])
         cmd.run(['--name=joe'])
         cmd.run(['-n=joe'])
 
+        @dispatch.command()
+        def fn(name: str):
+            '''
+            :n name: give the program a name
+            '''
+            self.assertEqual(name, 'joe')
+        fn(['--name', 'joe'])
+        fn(['-n', 'joe'])
+        fn(['--name=joe'])
+        fn(['-n=joe'])
+
     def testCommandSettings(self):
         @dispatch.command(hidden={'debug', 'verbose'})
         def f1(debug: bool, verbose: bool):
             ''':v verbose:'''
             exp = self.EMPTY_HELP.format(name='f1')
-            got = f1.__self__.helptext()
+            got = f1.helptext()
             self.assertEqual(exp, got)
             self.assertTrue(verbose)
-        f1(['-v'])
+            return 76
+        val = f1(['-v'])
+        self.assertEqual(val, 76)
 
         @dispatch.command(shorthands={'debug': 'd'})
         def f2(debug: bool):
+            self.assertTrue(len(f2.shorthands) == 1)
             self.assertTrue(debug)
-        f2(['-d'])
+            return 'what???'
+        val = f2(['-d'])
+        self.assertEqual(val, 'what???')
 
+class TestOptions(unittest.TestCase):
+    def testTypeParsing(self):
+        from typing import List, Set, Sequence, Dict
+
+        o = dispatch.Option('o', List[int])
+        o.setval('[1,2,3,4]')
+        self.assertTrue(isinstance(o.value, list))
+        for got, want in zip(o.value, [1, 2, 3, 4]):
+            self.assertTrue(isinstance(got, int))
+            self.assertTrue(isinstance(want, int))
+            self.assertEqual(got, want)
+
+        o = dispatch.Option('o', list)
+        o.setval('[1,2,3,4]')
+        self.assertTrue(isinstance(o.value, list))
+        for got, want in zip(o.value, [1, 2, 3, 4]):
+            self.assertTrue(isinstance(got, str))
+            self.assertTrue(isinstance(want, int))
+            self.assertEqual(int(got), want)
+            self.assertEqual(got, str(want))
+
+        o = dispatch.Option('o', Set[float])
+        o.setval('[1.5,2.6,3.7,4.8]')
+        self.assertTrue(isinstance(o.value, set))
+        for got, want in zip(o.value, [1.5,2.6,3.7,4.8]):
+            self.assertTrue(isinstance(got, float))
+            self.assertTrue(isinstance(want, float))
+            self.assertEqual(got, want)
+            self.assertEqual(got, want)
+
+        o = dispatch.Option('o', Dict[str, int])
+        o.setval('{one:1,two:2,three:3}')
+        self.assertTrue(isinstance(o.value, dict))
+        for k, v in o.value.items():
+            self.assertTrue(isinstance(k, str))
+            self.assertTrue(isinstance(v, int))
+
+
+class TestHelpers(unittest.TestCase):
+    def testIsIterable(self):
+        from typing import List, Dict, Sequence, Mapping
+        from dispatch import _is_iterable
+        self.assertTrue(_is_iterable(str))
+        self.assertTrue(_is_iterable(list))
+        self.assertTrue(_is_iterable(dict))
+        self.assertTrue(_is_iterable(set))
+        self.assertTrue(_is_iterable(List))
+        self.assertTrue(_is_iterable(Dict))
+        self.assertTrue(_is_iterable(Sequence))
+        self.assertTrue(_is_iterable(Mapping))
+        class A: pass
+        self.assertFalse(_is_iterable(int))
+        self.assertFalse(_is_iterable(float))
+        self.assertFalse(_is_iterable(A))
+
+        import inspect
+        inspect.isbuiltin
+        self.assertTrue(_is_iterable([1, 2, 3]))
+
+    def testFromTypingModule(self):
+        from dispatch import _from_typing_module
+        from typing import List, Sequence, Dict
+        self.assertTrue(_from_typing_module(List))
+        self.assertTrue(_from_typing_module(Sequence))
+        self.assertTrue(_from_typing_module(Dict[int, str]))
+        self.assertFalse(_from_typing_module(list))
+        self.assertFalse(_from_typing_module(int))
+        self.assertFalse(_from_typing_module(dict))
+        class A: pass
+        self.assertFalse(_from_typing_module(A))
+
+def expiriments():
+    def func(name, *args): pass
+    # def func(name, *, args=None): pass
+    import inspect
+    from inspect import signature
+
+    def lookat(x, prefix="_"):
+        for a in dir(x):
+            if not a.startswith(prefix):
+                attr = getattr(x, a)
+                print(a, attr, type(attr))
+
+    sig = signature(func)
+    args = sig.parameters['args']
+    print(args)
+    print(type(args))
+    lookat(args)
 
 if __name__ == '__main__':
     unittest.main()
+

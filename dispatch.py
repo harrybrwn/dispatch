@@ -52,10 +52,12 @@ class Command:
                          has greater precedence over doc parsing.
             defaults (dict): Give the command flags a default value use {<flag name>: <value>}
                              has greater precedence over doc parsing.
+            hidden (set):  list of flags that should be hidden
             doc_help (bool): If True, use the callback __doc__ as the help text
                              for this command.
             help_template (str): template used for the help text
-            hidden (set):  list of flags that should be hidden
+            check_names (bool): if True (True is default), the Command will check all the flag names given in
+                                any command settings or function docs to see if they are valid flags.
         '''
         self.callback = callback
         if not callable(self.callback):
@@ -89,7 +91,10 @@ class Command:
 
         # checking the Command settings for validity
         # raises error if there is an invalid setting
-        self._check_flag_settings()
+        check_names = kwrgs.get('check_names')
+        check_names = True if check_names is None else check_names
+        if check_names:
+            self._check_flag_settings()
 
     def __call__(self, argv=sys.argv):
         if argv is sys.argv:
@@ -324,14 +329,16 @@ def _parse_flags_doc(doc: str):
 
 
 def _from_typing_module(t) -> bool:
-    mod = t.__module__
-    return sys.modules[mod] == typing
+    if hasattr(t, '__module__'):
+        mod = t.__module__
+        return sys.modules[mod] == typing
+    return False
 
 
 def _is_iterable(t) -> bool:
     if _from_typing_module(t):
         return issubclass(t.__origin__, Iterable)
-    return issubclass(t, Iterable)
+    return isinstance(t, Iterable) or issubclass(t, Iterable)
 
 
 def helptext(fn):
