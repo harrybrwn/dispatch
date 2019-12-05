@@ -22,8 +22,8 @@ __all__ = ['Command', 'helptext', 'command']
 
 HELP_TMPL = '''{%- if main_doc -%}
 {{ main_doc }}
-{%- endif %}
 
+{% endif -%}
 Usage:
     {{ name }} [options]
 
@@ -102,11 +102,12 @@ class Command:
         if '--help' in argv or '-h' in argv:
             return self.help()
 
-        self.parse_args(argv)
-
-        fnargs = self._callback_args()
-        return self.callback(**fnargs)
-
+        try:
+            fn_args = self.parse_args(argv)
+        except RequiredFlagException as e:
+            print('Error:', e, '(see --help)', file=sys.stderr)
+            exit(1)
+        return self.callback(**fn_args)
 
     def help(self):
         print(self.helptext())
@@ -139,6 +140,7 @@ class Command:
                 help=self.docs.get(name),
                 value=self.defaults.get(name),
                 hidden=True if name in self.hidden else False,
+                has_default=name in self.defaults
             )
             flags[name] = opt
             if opt.shorthand:
@@ -168,9 +170,6 @@ class Command:
             if len(name) == 1 and flag.name in self.flags:
                 continue
             yield name, flag
-
-    def _callback_args(self) -> dict:
-        return {name: f.value for name, f in self.iter_named_flags()}
 
     def visible_flags(self) -> list:
         return [f for _, f in self.iter_named_flags() if not f.hidden]
@@ -205,6 +204,12 @@ class Command:
                     flag.setval(args.pop(0))
                 except ValueError as e:
                     raise UserLevelException(e)
+        func_args = {}
+        for name, flag in self.iter_named_flags():
+            if flag.value is None and not flag.has_default:
+                raise RequiredFlagException(f"'--{flag.name}' is a required flag")
+            func_args[name] = flag.value
+        return func_args
 
     def run(self, argv=sys.argv):
         return self.__call__(argv)
@@ -212,13 +217,14 @@ class Command:
 
 class Option:
     def __init__(self, name, typ, *,
-                 shorthand=None, help=None, value=None, hidden=None):
+                 shorthand=None, help=None, value=None,
+                 hidden=None, has_default=None):
         self.name = name
         self.type = typ or bool
         self.shorthand = shorthand
         self.help = help
         self.value = value
-        self.has_default = value is not None
+        self.has_default = has_default
         self.hidden = hidden if hidden is not None else False
 
     @property
@@ -293,22 +299,19 @@ class Option:
 def parse_doc(docstr):
     if docstr is None:
         return '', {}
-
-    docparts = docstr.split('\n\n')
-    if len(docparts) == 1:
-        if ':' in docparts[0]:
-            return '', _parse_flags_doc(docparts[0])
-        else:
-            return docstr.strip(), {}
-    elif len(docparts) < 2:
-        raise UserLevelException('must have two new-lines (\\n\\n) separating command doc from flag docs')
-
-    main_doc = '\n'.join([l.strip() for l in docparts[0].split('\n')])
-    return main_doc, _parse_flags_doc(''.join(docparts[1:]))
+    if ':' not in docstr:
+        main_doc = '\n'.join([l.strip() for l in docstr.split('\n') if l])
+        return main_doc.strip(), {}
+    else:
+        i = docstr.index(':')
+        main_doc = '\n'.join([l.strip() for l in docstr[:i].split('\n') if l])
+        return main_doc.strip(), _parse_flags_doc(docstr[i:])
 
 class UserLevelException(Exception): pass
 
 class DeveloperLevelException(Exception): pass
+
+class RequiredFlagException(Exception): pass
 
 def _parse_flags_doc(doc: str):
     res = {}
