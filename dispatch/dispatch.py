@@ -17,7 +17,7 @@ from collections.abc import Iterable
 import typing
 import jinja2
 
-__all__ = ['Command', 'helptext', 'command', 'handle']
+__all__ = ['Command', 'UserException', 'helptext', 'command', 'handle']
 
 
 HELP_TMPL = '''{%- if main_doc -%}
@@ -29,7 +29,8 @@ Usage:
 
 Options:
 {%- for flg in flags %}
-    {{ '{} {}'.format(flg, flg.show_default()) }}
+    {{ '{}'.format(flg) }}
+    {%- if flg.has_default %}{{ flg.show_default() }}{% endif %}
 {%- endfor %}
 '''
 
@@ -58,7 +59,7 @@ class Command:
             help_template (str): template used for the help text
                 to have a value of None. This would mean that none of the
                 command's flags are required.
-            allow_null (bool):  If True (default is False), flags are allowed
+            allow_null (bool):  If True (default is True), flags are allowed
             check_names (bool): If True (default is True), the Command will
                 check all the flag names given in any command settings or
                 function docs to see if they are valid flags.
@@ -87,7 +88,7 @@ class Command:
         self.help_template = kwrgs.get('help_template') or HELP_TMPL
         self.hidden = kwrgs.get('hidden') or set()
         self.doc_help = kwrgs.get('doc_help') or False
-        self.allow_null = kwrgs.get('allow_null') or False
+        self.allow_null = kwrgs.get('allow_null') or True
 
         self.shorthands.update(kwrgs.get('shorthands') or {})
         self.docs.update(kwrgs.get('docs') or {})
@@ -188,7 +189,7 @@ class Command:
         while args:
             arg = args.pop(0)
             if arg[0] != '-':
-                self._cmd_args.append(arg)
+                self.args.append(arg)
                 continue
 
             arg = arg.lstrip('-').replace('-', '_')
@@ -423,7 +424,7 @@ def handle(fn):
     try:
         fn()
     except UserException as e:
-        print(e, file=sys.stderr)
+        print('Error:', e, file=sys.stderr)
         exit(1)
 
 
