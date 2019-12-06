@@ -10,7 +10,7 @@ Inspired by [fire](https://github.com/google/python-fire) and [click](https://cl
 import dispatch
 
 @dispatch.command(hidden={'debug'})
-def hello(name: str, verbose: bool=False, debug=False):
+def hello(name: str, verbose: bool, debug: bool):
     '''Run the 'hello' command line interface.
 
     :v verbose: Run the command verbosly
@@ -37,9 +37,9 @@ Usage:
     hello [options]
 
 Options:
-        --name          Name of the person you are saying hello to.
-    -v, --verbose       Run the command verbosly
-    -h, --help          Get help.
+        --name         Name of the person you are saying hello to.
+    -v, --verbose      Run the command verbosly
+    -h, --help         Get help.
 ```
 
 Properties of Flags
@@ -71,3 +71,7 @@ def cli(name: str):
 cli(['']) # no arguments given
 ```
 This example function will give raise an error saying that the name flag needs to be specified.
+
+Command Settings
+================
+-

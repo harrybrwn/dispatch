@@ -29,8 +29,7 @@ Usage:
 
 Options:
 {%- for flg in flags %}
-    {{ '{}'.format(flg) }}
-    {%- if flg.has_default %} (default: {{ flg.value }}){% endif -%}
+    {{ '{} {}'.format(flg, flg.show_default()) }}
 {%- endfor %}
 '''
 
@@ -94,6 +93,7 @@ class Command:
         self.docs.update(kwrgs.get('docs') or {})
         self.defaults.update(kwrgs.get('defaults') or {})
 
+        self.args = []
         self.flags = self._find_flags(flagdoc)
 
         # checking the Command settings for validity
@@ -255,7 +255,8 @@ class Option:
         else:
             fmt = "    %s--%-*s%s"
         return fmt % (
-            self.shorthand or '', self.format_len, self.name, self.help or '')
+            self.shorthand or '', self.format_len,
+            self.name.replace('_', '-'), self.help or '')
 
     @property
     def value(self):
@@ -266,6 +267,15 @@ class Option:
         self._value = val
         if val is not None:
             self.type = val.__class__
+
+    def show_default(self) -> str:
+        if not self.has_default:
+            return ''
+        elif self.type is not bool and self.value:
+            return f'(default: {self.value})'
+        elif self.type is bool:
+            return f'(default: {self.value})'
+        return ''
 
     def setval(self, val):
         '''
