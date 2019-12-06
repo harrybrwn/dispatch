@@ -17,7 +17,7 @@ from collections.abc import Iterable
 import typing
 import jinja2
 
-__all__ = ['Command', 'helptext', 'command']
+__all__ = ['Command', 'helptext', 'command', 'handle']
 
 
 HELP_TMPL = '''{%- if main_doc -%}
@@ -29,11 +29,8 @@ Usage:
 
 Options:
 {%- for flg in flags %}
-    {% if flg.shorthand -%}
-        -{{ flg.shorthand }}, {% else %}{{ " " * 4 }}
-    {%- endif -%}
-    --{{ "%-*s %s"|format(opts_fmt_len, flg.name, flg.help or '')}}
-    {%- if flg.default %} (default: {{flg.default}}){% endif -%}
+    {{ '{}'.format(flg) }}
+    {%- if flg.has_default %} (default: {{ flg.value }}){% endif -%}
 {%- endfor %}
 '''
 
@@ -46,21 +43,26 @@ class Command:
             callback: a function that runs the command
 
         Keyword Args:
-            shorthands (dict): Give the command flags a shorthand use {<flag name>: <shorthand>},
-                               has greater precedence over doc parsing.
-            docs (dict): Give the command flags a doc string use {<flag name>: <help text>}
-                         has greater precedence over doc parsing.
-            defaults (dict): Give the command flags a default value use {<flag name>: <value>}
-                             has greater precedence over doc parsing.
+            shorthands (dict): Give the command flags a shorthand use
+                {<flag name>: <shorthand>}, has greater precedence over doc
+                parsing.
+            docs (dict): Give the command flags a doc string use
+                {<flag name>: <help text>} has greater precedence over doc
+                parsing.
+            defaults (dict): Give the command flags a default value use
+                {<flag name>: <value>} has greater precedence over doc parsing.
             hidden (set):  The set of flag names that should be hidden.
 
-            doc_help (bool): If True (default is False), use the callback __doc__ as the help text
-                             for this command.
+            help: (str):        Command's main description.
+            doc_help (bool): If True (default is False), use the callback
+                __doc__ as the help text for this command.
             help_template (str): template used for the help text
-            allow_null (bool):  If True (default is False), flags are allowed to have a value of None.
-                                This would mean that none of the command's flags are required.
-            check_names (bool): If True (default is True), the Command will check all the flag names given in
-                                any command settings or function docs to see if they are valid flags.
+                to have a value of None. This would mean that none of the
+                command's flags are required.
+            allow_null (bool):  If True (default is False), flags are allowed
+            check_names (bool): If True (default is True), the Command will
+                check all the flag names given in any command settings or
+                function docs to see if they are valid flags.
         '''
         self.callback = callback
         if not callable(self.callback):
@@ -82,9 +84,10 @@ class Command:
                 reversed(self.callback.__defaults__ or []))
         )
 
+        self._help = kwrgs.get('help') or self._help
         self.help_template = kwrgs.get('help_template') or HELP_TMPL
         self.hidden = kwrgs.get('hidden') or set()
-        self.doc_help = kwrgs.get('doc_help') or False  # use callback.__doc__ as helptext
+        self.doc_help = kwrgs.get('doc_help') or False
         self.allow_null = kwrgs.get('allow_null') or False
 
         self.shorthands.update(kwrgs.get('shorthands') or {})
@@ -116,12 +119,14 @@ class Command:
         if self.doc_help:
             return self.callback.__doc__
 
-        helpflag = Option('help', bool, help='Get help.')
-        helpflag.shorthand = 'h'
+        helpflag = Option('help', bool, shorthand='h', help='Get help.')
 
         flags = self.visible_flags()
         flags.append(helpflag)
+
         fmt_len = max([len(f) for f in flags])
+        for f in flags:
+            f.format_len = fmt_len
 
         tmpl = jinja2.Template(self.help_template)
         return tmpl.render({
@@ -133,7 +138,7 @@ class Command:
 
     def _find_flags(self, flagdoc):
         if not self.flagnames:
-            return dict() # there are no flags to find
+            return dict()  # there are no flags to find
 
         flags = {}
         for name in self.flagnames:
@@ -169,7 +174,7 @@ class Command:
 
     def iter_named_flags(self):
         if not self.flags:
-            return [] # so we dont iterate over None
+            return []  # so we dont iterate over None
         for name, flag in self.flags.items():
             if len(name) == 1 and flag.name in self.flags:
                 continue
@@ -210,7 +215,7 @@ class Command:
                 flag.value = True if flag.value is None else not flag.value
 
         if self.allow_null:
-            return dict(self.iter_named_flags())
+            return {n: f.value for n, f in self.iter_named_flags()}
         return self._null_check_flag_args()
 
     def run(self, argv=sys.argv):
@@ -225,8 +230,10 @@ class Command:
                 if flag.type is bool:
                     flag.value = False
                 else:
-                    raise RequiredFlagError(f"'--{flag.name}' is a required flag")
+                    raise RequiredFlagError(
+                        f"'--{flag.name}' is a required flag")
             values[name] = flag.value
+        return values
 
 
 class Option:
@@ -240,6 +247,15 @@ class Option:
         self.value = value
         self.has_default = has_default
         self.hidden = hidden if hidden is not None else False
+        self.format_len = 1
+
+    def __format__(self, format_len):
+        if self.shorthand:
+            fmt = "-%s, --%-*s%s"
+        else:
+            fmt = "    %s--%-*s%s"
+        return fmt % (
+            self.shorthand or '', self.format_len, self.name, self.help or '')
 
     @property
     def value(self):
@@ -288,7 +304,6 @@ class Option:
             else:
                 self._value = self.type(val)
 
-
     def __repr__(self):
         return "{}('{}--{}', {})".format(
             self.__class__.__name__,
@@ -297,18 +312,20 @@ class Option:
         )
 
     def __str__(self):
-        return '{}--{} {}'.format(
-            f'-{self.shorthand} ' if self.shorthand else '',
-            self.name, self.help)
+        if self.shorthand:
+            return '-{}, --{}'.format(self.shorthand, self.name)
+        else:
+            return '--{}'.format(self.name)
 
     def __len__(self):
         '''Get the length of the option name when formatted in the help text
-        eg. same as `len('-v, --verbose')`
+        eg. same as `len('-v, --verbose') or `len('    --verbose')``
         '''
-        length = len(self.name) + 2 # plus len of '--'
+        length = len(self.name) + 2  # plus len of '--'
         if self.shorthand:
-            length += 4 # length of '-v, ' if v is the shorthand
+            length += 4  # length of '-v, ' if v is the shorthand
         return length
+
 
 def parse_doc(docstr: str) -> tuple:
     if docstr is None:
@@ -328,8 +345,10 @@ def parse_doc(docstr: str) -> tuple:
 class UserException(Exception):
     pass
 
+
 class DeveloperException(Exception):
     pass
+
 
 class RequiredFlagError(UserException):
     pass
@@ -374,8 +393,6 @@ def _is_iterable(t) -> bool:
 
 
 def helptext(fn):
-    meta = fn.__code__
-    flagnames = meta.co_varnames[:meta.co_argcount]
     maindoc, flagdoc = parse_doc(fn.__doc__)
 
     tmpl = jinja2.Template(HELP_TMPL)

@@ -3,12 +3,13 @@
 import unittest
 from dispatch import dispatch
 
+
 class TestCommand(unittest.TestCase):
     class FlagType:
         def __init(self, name):
             self.name = name
 
-    EMPTY_HELP = expected = 'Usage:\n    {name} [options]\n\nOptions:\n    -h, --help       Get help.'
+    EMPTY_HELP = expected = 'Usage:\n    {name} [options]\n\nOptions:\n    -h, --help      Get help.' # noqa
 
     def testCommand(self):
         def fn(arg1, arg2): pass
@@ -37,10 +38,9 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(flags['pi'].type, float)
 
     def testDocParsing(self):
-        def fn(verbose=False, pi=3.14159, tag: str=''):
+        def fn(verbose=False, pi=3.14159, tag: str = ''):
             '''fn is a function
             that has a multi-line description.
-
             :v verbose:
             : pi  : this is the value of pi
 
@@ -58,7 +58,8 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(parsed['tag']['doc'], "this is a tag")
 
         cmd = dispatch.Command(fn)
-        self.assertEqual(cmd._help, "fn is a function\nthat has a multi-line description.")
+        self.assertEqual(
+            cmd._help, "fn is a function\nthat has a multi-line description.")
         self.assertEqual(len(cmd.flags), 5)
         self.assertEqual(len(cmd._named_flags()), 3)
         f = cmd.flags['verbose']
@@ -85,7 +86,7 @@ class TestCommand(unittest.TestCase):
         def f1(verbose: bool): pass
         cmd = dispatch.Command(f1)
         htext = cmd.helptext()
-        expected = 'Usage:\n    f1 [options]\n\nOptions:\n        --verbose    \n    -h, --help       Get help.'
+        expected = 'Usage:\n    f1 [options]\n\nOptions:\n        --verbose   \n    -h, --help      Get help.' # noqa
         self.assertTrue(htext and len(htext) > 5)
         self.assertEqual(expected, cmd.helptext())
 
@@ -126,11 +127,13 @@ class TestCommand(unittest.TestCase):
         @dispatch.command()
         def fn(multi_word_flag, bool_flag: bool):
             self.assertTrue(multi_word_flag)
-            self.assertTrue(bool_flag == False)
+            self.assertFalse(bool_flag)
         fn(['--multi-word-flag'])
 
     def testCommandSettings(self):
-        @dispatch.command(hidden={'debug', 'verbose'}, defaults={'debug': False})
+        @dispatch.command(
+            hidden={'debug', 'verbose'},
+            defaults={'debug': False})
         def f1(debug: bool, verbose: bool):
             ''':v verbose:'''
             exp = self.EMPTY_HELP.format(name='f1')
@@ -143,17 +146,30 @@ class TestCommand(unittest.TestCase):
         val = f1(['-v'])
         self.assertEqual(val, 76)
 
-        @dispatch.command(shorthands={'debug': 'd'})
-        def f2(debug: bool=False):
+        @dispatch.command(shorthands={'debug': 'd'},
+                          help="f2 is a test command")
+        def f2(debug: bool = False):
             self.assertTrue(len(f2.shorthands) == 1)
             self.assertTrue(debug)
             return 'what???'
         val = f2(['-d'])
         self.assertEqual(val, 'what???')
+        self.assertIn('f2 is a test command', f2.helptext())
+
+        @dispatch.command(doc_help=True, allow_null=True)
+        def f3(some_string: str):
+            '''this is the raw documentation
+-h, --help'''
+            self.assertTrue(some_string is None)
+        self.assertEqual(
+            f3.helptext(), 'this is the raw documentation\n-h, --help')
+        f3()
+
 
 class TestOptions(unittest.TestCase):
+
     def testTypeParsing(self):
-        from typing import List, Set, Sequence, Dict
+        from typing import List, Set, Dict
 
         o = dispatch.Option('o', List[int])
         o.setval('[1,2,3,4]')
@@ -175,7 +191,7 @@ class TestOptions(unittest.TestCase):
         o = dispatch.Option('o', Set[float])
         o.setval('[1.5,2.6,3.7,4.8]')
         self.assertTrue(isinstance(o.value, set))
-        for got, want in zip(o.value, [1.5,2.6,3.7,4.8]):
+        for got, want in zip(o.value, [1.5, 2.6, 3.7, 4.8]):
             self.assertTrue(isinstance(got, float))
             self.assertTrue(isinstance(want, float))
             self.assertEqual(got, want)
@@ -192,11 +208,29 @@ class TestOptions(unittest.TestCase):
         from typing import Dict
 
         o = dispatch.Option('outout', Dict[str, float])
-        self.assertRaises(ValueError, o.setval, '{one:1.0,two:2.5,three:the third number,four:4}')
+        self.assertRaises(
+            ValueError, o.setval,
+            '{one:1.0,two:2.5,three:the third number,four:4}')
+
         @dispatch.command()
         def f(keys: Dict[str, float]):
             pass
-        self.assertRaises(ValueError, f, ['--keys', '{one:1,two:this is the number two}'])
+        self.assertRaises(
+            ValueError, f, ['--keys', '{one:1,two:this is the number two}'])
+
+    def testOptionFormatting(self):
+        opts = [
+            dispatch.Option(
+                'out', bool, shorthand='o', help='Give the output'),
+            dispatch.Option(
+                'verbose', bool, shorthand='v', help='the verbosity'),
+            dispatch.Option(
+                'name', str, help='the name'),
+        ]
+        l = max([len(o.name)+2 for o in opts]) # noqa
+        for o in opts:
+            o.format_len = l
+            self.assertEqual(o.format_len, l)
 
 
 class TestHelpers(unittest.TestCase):
@@ -211,7 +245,8 @@ class TestHelpers(unittest.TestCase):
         self.assertTrue(_is_iterable(Dict))
         self.assertTrue(_is_iterable(Sequence))
         self.assertTrue(_is_iterable(Mapping))
-        class A: pass
+
+        class A: pass # noqa
         self.assertFalse(_is_iterable(int))
         self.assertFalse(_is_iterable(float))
         self.assertFalse(_is_iterable(A))
@@ -229,13 +264,14 @@ class TestHelpers(unittest.TestCase):
         self.assertFalse(_from_typing_module(list))
         self.assertFalse(_from_typing_module(int))
         self.assertFalse(_from_typing_module(dict))
-        class A: pass
+        class A: pass # noqa
         self.assertFalse(_from_typing_module(A))
+
 
 def expiriments():
     def func(name, *args): pass
     # def func(name, *, args=None): pass
-    import inspect
+    import inspect # noqa
     from inspect import signature
 
     def lookat(x, prefix="_"):
@@ -250,6 +286,6 @@ def expiriments():
     print(type(args))
     lookat(args)
 
+
 if __name__ == '__main__':
     unittest.main()
-
