@@ -52,11 +52,14 @@ class Command:
                          has greater precedence over doc parsing.
             defaults (dict): Give the command flags a default value use {<flag name>: <value>}
                              has greater precedence over doc parsing.
-            hidden (set):  list of flags that should be hidden
-            doc_help (bool): If True, use the callback __doc__ as the help text
+            hidden (set):  The set of flag names that should be hidden.
+
+            doc_help (bool): If True (default is False), use the callback __doc__ as the help text
                              for this command.
             help_template (str): template used for the help text
-            check_names (bool): if True (True is default), the Command will check all the flag names given in
+            allow_null (bool):  If True (default is False), flags are allowed to have a value of None.
+                                This would mean that none of the command's flags are required.
+            check_names (bool): If True (default is True), the Command will check all the flag names given in
                                 any command settings or function docs to see if they are valid flags.
         '''
         self.callback = callback
@@ -81,7 +84,8 @@ class Command:
 
         self.help_template = kwrgs.get('help_template') or HELP_TMPL
         self.hidden = kwrgs.get('hidden') or set()
-        self.doc_help = kwrgs.get('doc_help') or False
+        self.doc_help = kwrgs.get('doc_help') or False  # use callback.__doc__ as helptext
+        self.allow_null = kwrgs.get('allow_null') or False
 
         self.shorthands.update(kwrgs.get('shorthands') or {})
         self.docs.update(kwrgs.get('docs') or {})
@@ -108,7 +112,10 @@ class Command:
     def help(self):
         print(self.helptext())
 
-    def helptext(self):
+    def helptext(self) -> str:
+        if self.doc_help:
+            return self.callback.__doc__
+
         helpflag = Option('help', bool, help='Get help.')
         helpflag.shorthand = 'h'
 
@@ -179,7 +186,7 @@ class Command:
                 self._cmd_args.append(arg)
                 continue
 
-            arg = arg.lstrip('-')
+            arg = arg.lstrip('-').replace('-', '_')
 
             val = None
             if '=' in arg:
@@ -202,23 +209,31 @@ class Command:
             elif flag.type is bool:
                 flag.value = True if flag.value is None else not flag.value
 
-        func_args = {}
-        for name, flag in self.iter_named_flags():
-            if flag.value is None and not flag.has_default:
-                raise RequiredFlagError(f"'--{flag.name}' is a required flag")
-            func_args[name] = flag.value
-        return func_args
+        if self.allow_null:
+            return dict(self.iter_named_flags())
+        return self._null_check_flag_args()
 
     def run(self, argv=sys.argv):
         return self.__call__(argv)
+
+    def _null_check_flag_args(self) -> dict:
+        values = {}
+        for name, flag in self.iter_named_flags():
+            # all flags should have a value at this point
+            # if not, booleans are false all else raises an error
+            if not flag.has_default and flag.value is None:
+                if flag.type is bool:
+                    flag.value = False
+                else:
+                    raise RequiredFlagError(f"'--{flag.name}' is a required flag")
+            values[name] = flag.value
 
 
 class Option:
     def __init__(self, name, typ, *,
                  shorthand=None, help=None, value=None,
                  hidden=None, has_default=None):
-        self.arg_name = name
-        self.name = name.replace('_', '-')
+        self.name = name
         self.type = typ or bool
         self.shorthand = shorthand
         self.help = help
@@ -307,7 +322,7 @@ def parse_doc(docstr: str) -> tuple:
         flags = _parse_flags_doc(docstr[i:])
 
     doc = '\n'.join([l.strip() for l in desc.split('\n') if l])
-    return doc, flags
+    return doc.strip(), flags
 
 
 class UserException(Exception):

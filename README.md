@@ -41,3 +41,33 @@ Options:
     -v, --verbose       Run the command verbosly
     -h, --help          Get help.
 ```
+
+Properties of Flags
+===================
+Because flags are specified by function arguments, the properties of flags are a little bit weird.
+
+Boolean Flags
+-------------
+All boolean flags have a default of `False`.
+
+A positional argument with no default and no type annotation is assumed to be a boolean flag and will default to a value of `False`.
+```python
+@disptch.command()
+def cli(verbose):
+    if verbose:
+        print('the verbose flag has been given')
+    else:
+        print('using default of False for verbose')
+```
+
+Type annotations
+----------------
+However, if a positional argument is given a type annotation that isn't `bool`, the user will get an error if the do not give that flag.
+```python
+@despatch.command()
+def cli(name: str):
+    print('hello, ' + name)
+
+cli(['']) # no arguments given
+```
+This example function will give raise an error saying that the name flag needs to be specified.

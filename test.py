@@ -123,6 +123,12 @@ class TestCommand(unittest.TestCase):
         r = fn(['-n=joe'])
         self.assertTrue(r == 2)
 
+        @dispatch.command()
+        def fn(multi_word_flag, bool_flag: bool):
+            self.assertTrue(multi_word_flag)
+            self.assertTrue(bool_flag == False)
+        fn(['--multi-word-flag'])
+
     def testCommandSettings(self):
         @dispatch.command(hidden={'debug', 'verbose'}, defaults={'debug': False})
         def f1(debug: bool, verbose: bool):
