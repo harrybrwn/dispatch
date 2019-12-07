@@ -37,9 +37,9 @@ Usage:
     hello [options]
 
 Options:
-        --name         Name of the person you are saying hello to.
-    -v, --verbose      Run the command verbosly
-    -h, --help         Get help.
+        --name      Name of the person you are saying hello to.
+    -v, --verbose   Run the command verbosly
+    -h, --help      Get help.
 ```
 
 Properties of Flags
