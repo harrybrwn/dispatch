@@ -9,7 +9,7 @@ class TestCommand(unittest.TestCase):
         def __init(self, name):
             self.name = name
 
-    EMPTY_HELP = expected = 'Usage:\n    {name} [options]\n\nOptions:\n    -h, --help      Get help.' # noqa
+    EMPTY_HELP = expected = 'Usage:\n    {name} [options]\n\nOptions:\n    -h, --help   Get help.' # noqa
 
     def testCommand(self):
         def fn(arg1, arg2): pass
@@ -145,6 +145,7 @@ class TestCommand(unittest.TestCase):
             return 76
         val = f1(['-v'])
         self.assertEqual(val, 76)
+        self.assertEqual(str(f1), f1.helptext())
 
         @dispatch.command(shorthands={'debug': 'd'},
                           help="f2 is a test command")
@@ -155,6 +156,7 @@ class TestCommand(unittest.TestCase):
         val = f2(['-d'])
         self.assertEqual(val, 'what???')
         self.assertIn('f2 is a test command', f2.helptext())
+        self.assertEqual(str(f2), f2.helptext())
 
         @dispatch.command(doc_help=True, allow_null=True)
         def f3(some_string: str):
@@ -164,6 +166,9 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(
             f3.helptext(), 'this is the raw documentation\n-h, --help')
         f3()
+
+    def testFormat(self):
+        pass
 
 
 class TestOptions(unittest.TestCase):
@@ -229,8 +234,17 @@ class TestOptions(unittest.TestCase):
         ]
         l = max([len(o.name)+2 for o in opts]) # noqa
         for o in opts:
-            o.format_len = l
-            self.assertEqual(o.format_len, l)
+            o.f_len = l
+            self.assertEqual(o.f_len, l)
+
+    # def testFormat(self):
+    #     o = dispatch.Option(
+    #             'out', bool, shorthand='o', help='Give the output')
+    #     print()
+    #     print('{:<10}'.format(o))
+    #     print('--{name}{help:>15}'.format(
+    #         name='out', help='hello are you there'))
+    #     print('hell{x:>6}'.format(x='hello'))
 
 
 class TestHelpers(unittest.TestCase):
@@ -245,7 +259,6 @@ class TestHelpers(unittest.TestCase):
         self.assertTrue(_is_iterable(Dict))
         self.assertTrue(_is_iterable(Sequence))
         self.assertTrue(_is_iterable(Mapping))
-
         class A: pass # noqa
         self.assertFalse(_is_iterable(int))
         self.assertFalse(_is_iterable(float))

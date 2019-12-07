@@ -36,6 +36,7 @@ Options:
 
 
 class Command:
+
     def __init__(self, callback, **kwrgs):
         # note: docs are modified at runtime
         '''
@@ -113,6 +114,12 @@ class Command:
         fn_args = self.parse_args(argv)
         return self.callback(**fn_args)
 
+    def __repr__(self):
+        return f'{self.__class__.__name__}({self.callback.__name__}())'
+
+    def __str__(self):
+        return self.helptext()
+
     def help(self):
         print(self.helptext())
 
@@ -125,15 +132,14 @@ class Command:
         flags = self.visible_flags()
         flags.append(helpflag)
 
-        fmt_len = max([len(f) for f in flags])
+        fmt_len = max([len(f.name) for f in flags]) + 3
         for f in flags:
-            f.format_len = fmt_len
+            f.f_len = fmt_len
 
         tmpl = jinja2.Template(self.help_template)
         return tmpl.render({
             'main_doc': self._help,
             'name': self.name,
-            'opts_fmt_len': fmt_len,
             'flags': flags,
         })
 
@@ -248,16 +254,14 @@ class Option:
         self.value = value
         self.has_default = has_default
         self.hidden = hidden if hidden is not None else False
-        self.format_len = 1
+        self.f_len = len(self.name)  # temp value, should be set later
 
-    def __format__(self, format_len):
-        if self.shorthand:
-            fmt = "-%s, --%-*s%s"
-        else:
-            fmt = "    %s--%-*s%s"
-        return fmt % (
-            self.shorthand or '', self.format_len,
-            self.name.replace('_', '-'), self.help or '')
+    def __format__(self, spec):
+        return '{short}--{name:{0}}{help}'.format(
+            f'<{self.f_len}' if not spec else spec,
+            short=f'-{self.shorthand}, ' if self.shorthand else ' ' * 4,
+            name=self.name.replace('_', '-'),
+            help=self.help or '')
 
     @property
     def value(self):
@@ -317,16 +321,13 @@ class Option:
 
     def __repr__(self):
         return "{}('{}--{}', {})".format(
-            self.__class__.__name__,
-            f'-{self.shorthand} ' if self.shorthand else '',
-            self.name, self.type
-        )
+            self.__class__.__name__, str(self), self.type)
 
     def __str__(self):
         if self.shorthand:
             return '-{}, --{}'.format(self.shorthand, self.name)
         else:
-            return '--{}'.format(self.name)
+            return '     --{}'.format(self.name)
 
     def __len__(self):
         '''Get the length of the option name when formatted in the help text
