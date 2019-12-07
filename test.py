@@ -81,6 +81,10 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(cmd.flags['t'].value, '')
         self.assertEqual(cmd.flags['t'], cmd.flags['tag'])
         self.assertEqual(id(cmd.flags['t']), id(cmd.flags['tag']))
+        print()
+        print(cmd._fmt_help)
+        print('\n\n')
+        cmd.help()
 
     def testBadDoc(self):
         def f1(verbose: bool): pass
@@ -123,6 +127,7 @@ class TestCommand(unittest.TestCase):
         self.assertTrue(r == 2)
         r = fn(['-n=joe'])
         self.assertTrue(r == 2)
+        # print(fn._flaghelp)
 
         @dispatch.command()
         def fn(multi_word_flag, bool_flag: bool):
@@ -140,6 +145,7 @@ class TestCommand(unittest.TestCase):
             got = f1.helptext()
             self.assertEqual(exp, got)
             self.assertTrue(verbose)
+            self.assertFalse(debug)
             self.assertTrue(len(f1.hidden) == 2)
             self.assertTrue(len(f1.defaults) == 1)
             return 76
@@ -233,9 +239,7 @@ class TestOptions(unittest.TestCase):
                 'name', str, help='the name'),
         ]
         l = max([len(o.name)+2 for o in opts]) # noqa
-        for o in opts:
-            o.f_len = l
-            self.assertEqual(o.f_len, l)
+
 
     # def testFormat(self):
     #     o = dispatch.Option(

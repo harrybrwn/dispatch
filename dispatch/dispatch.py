@@ -70,12 +70,11 @@ class Command:
             raise DeveloperException('Command callback needs to be callable')
         meta = self.callback.__code__
         self.flagnames = meta.co_varnames[:meta.co_argcount]
+        self.name = self.callback.__name__
 
+        self._help, flagdoc = parse_doc(self.callback.__doc__)
         self.shorthands = {}
         self.docs = {}
-
-        self.name = self.callback.__name__
-        self._help, flagdoc = parse_doc(self.callback.__doc__)
         for key, val in flagdoc.items():
             self.shorthands[key] = val.get('shorthand')
             self.docs[key] = val.get('doc')
@@ -96,7 +95,7 @@ class Command:
         self.defaults.update(kwrgs.get('defaults') or {})
 
         self.args = []
-        self.flags = self._find_flags(flagdoc)
+        self.flags = self._find_flags()
 
         # checking the Command settings for validity
         # raises error if there is an invalid setting
@@ -120,6 +119,16 @@ class Command:
     def __str__(self):
         return self.helptext()
 
+    def _flag_lengths(self, flags=[]):
+        return max([len(f.name) for f in flags or self.visible_flags()]) + 3
+
+    @property
+    def _flag_help(self):
+        fmt = '    {1:<{0}}'
+        flags = list(self.visible_flags())
+        flen = self._flag_lengths(flags)
+        return '\n'.join([fmt.format(flen, f) for f in flags])
+
     def help(self):
         print(self.helptext())
 
@@ -127,10 +136,7 @@ class Command:
         if self.doc_help:
             return self.callback.__doc__
 
-        helpflag = Option('help', bool, shorthand='h', help='Get help.')
-
-        flags = self.visible_flags()
-        flags.append(helpflag)
+        flags = list(self.visible_flags())
 
         fmt_len = max([len(f.name) for f in flags]) + 3
         for f in flags:
@@ -143,10 +149,7 @@ class Command:
             'flags': flags,
         })
 
-    def _find_flags(self, flagdoc):
-        if not self.flagnames:
-            return dict()  # there are no flags to find
-
+    def _find_flags(self):
         flags = {}
         for name in self.flagnames:
             opt = Option(
@@ -180,17 +183,25 @@ class Command:
         return {key: val for key, val in self.iter_named_flags()}
 
     def iter_named_flags(self):
-        if not self.flags:
-            return []  # so we dont iterate over None
         for name, flag in self.flags.items():
             if len(name) == 1 and flag.name in self.flags:
                 continue
             yield name, flag
 
     def visible_flags(self) -> list:
-        return [f for _, f in self.iter_named_flags() if not f.hidden]
+        helpflag = Option('help', bool, shorthand='h', help='Get help.')
+        for flag in self.flags.values():
+            if flag.shorthand or flag.hidden:
+                continue
+            yield flag
+        yield helpflag
 
-    def parse_args(self, args):
+    def parse_args(self, args: list) -> dict:
+        '''
+        Parse a list of strings and return a dictionary of function arguments.
+        The return values is supposd to be unpacked and used as an argument
+        to the Command's callback function.
+        '''
         args = args[:]
         while args:
             arg = args.pop(0)
@@ -320,7 +331,7 @@ class Option:
                 self._value = self.type(val)
 
     def __repr__(self):
-        return "{}('{}--{}', {})".format(
+        return "{}('{}', {})".format(
             self.__class__.__name__, str(self), self.type)
 
     def __str__(self):
@@ -405,14 +416,7 @@ def _is_iterable(t) -> bool:
 
 
 def helptext(fn):
-    maindoc, flagdoc = parse_doc(fn.__doc__)
-
-    tmpl = jinja2.Template(HELP_TMPL)
-    return tmpl.render({
-        'main_doc': maindoc,
-        'name': fn.__name__,
-        'flags': Command(fn).visible_flags()
-    })
+    return Command(fn).helptext()
 
 
 def command(**kwrgs):
