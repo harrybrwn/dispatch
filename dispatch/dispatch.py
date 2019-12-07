@@ -127,7 +127,7 @@ class Command:
         fmt = '    {1:<{0}}'
         flags = list(self.visible_flags())
         flen = self._flag_lengths(flags)
-        return '\n'.join([fmt.format(flen, f) for f in flags])
+        return '\n'.join(['    {1:<{0}}'.format(flen, f) for f in flags])
 
     def help(self):
         print(self.helptext())
@@ -190,8 +190,8 @@ class Command:
 
     def visible_flags(self) -> list:
         helpflag = Option('help', bool, shorthand='h', help='Get help.')
-        for flag in self.flags.values():
-            if flag.shorthand or flag.hidden:
+        for name, flag in self.flags.items():
+            if (len(name) == 1 and flag.shorthand) or flag.hidden:
                 continue
             yield flag
         yield helpflag
@@ -267,6 +267,10 @@ class Option:
         self.hidden = hidden if hidden is not None else False
         self.f_len = len(self.name)  # temp value, should be set later
 
+        if self.shorthand == 'h' and self.name != 'help':
+            raise DeveloperException(
+                "cannot use 'h' as shorthand (reserved for --help)")
+
     def __format__(self, spec):
         return '{short}--{name:{0}}{help}'.format(
             f'<{self.f_len}' if not spec else spec,
@@ -304,7 +308,7 @@ class Option:
         represents.
         '''
         # TODO: type checking does not work if the annotation is an abstract
-        #       base class.
+        #       base class. (collections.abc.Sequence etc..)
 
         if not isinstance(val, str) or self.type is str:
             # if val is not a string then the type has already been converted
