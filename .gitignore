@@ -1,6 +1,10 @@
 # Testing
 /benchmarks/
 
+# Build
+*.egg-info
+/dist/
+
 # Dev
 __pycache__/
 /.vscode/
