@@ -10,16 +10,16 @@ from ._funcmeta import _FunctionMeta
 class Option:
     def __init__(self, name, typ, *,
                  shorthand=None, help=None, value=None,
-                 hidden=None, has_default=None):
+                 hidden=False, has_default=False):
         self.name = name
         self.type = typ or bool
 
         self.shorthand = shorthand
         self.help = help or ''
-        self.value = value # will infer and set the type
+        self.value = value  # will infer and set the type
 
-        self.hidden = hidden if hidden is not None else False
-        self.has_default = has_default or value is not None
+        self.hidden = hidden
+        self.has_default = has_default
         self.f_len = len(self.name)  # temp value, should be set later
 
         if self.shorthand == 'h' and self.name != 'help':
@@ -132,24 +132,24 @@ class FlagSet:
     DEFAULT_HELP_FLAG = Option('help', bool, shorthand='h', help='Get help.')
     MIN_FMT_LEN = 3
 
-    def __init__(self, *, obj=None, names: list = None,
-                 defaults: dict = None, docs: dict = None,
-                 shorthands: dict = None, types: dict = None,
-                 hidden: set = None):
+    def __init__(self, *, obj=None, names: list = None, defaults: dict = {},
+                 docs: dict = {}, shorthands: dict = {}, types: dict = {},
+                 hidden: set = {}):
         '''
         Create a FlagSet
 
-            obj:        create a new FlagSet from an object (usually a dataclass)
+            obj:        create a new FlagSet from an object (usually a
+                dataclass or another FlagSet)
             names:      `list` of flag names, use only the fullnames
             defaults:   `dict` of default flag values
             docs:       `dict` of default flag help text
             types:      `dict` of type annotations
             shorthands: `dict` of flag shorthands. Give it in the format
-                        {<flagname>: <shorthand>} but know that the copy
-                        stored in the flag set will also store flagnames in
-                        the format {<shorthand>: <flagname>}.
-            hidden:     `set` of the flagnames that will be hidden from the
-                        help text of the FlagSet.
+                {<flagname>: <shorthand>} but know that the copy stored in the
+                flag set will also store flagnames in the format
+                {<shorthand>: <flagname>}.
+            hidden: `set` of the flagnames that will be hidden from the help
+                text of the FlagSet.
         '''
         self._flags = {}
         self._flagnames = names or []
@@ -163,13 +163,11 @@ class FlagSet:
                 value=defaults.get(name),
                 hidden=name in hidden,
             )
-            self._flags[name] = opt
-            if opt.shorthand:
-                self._shorthands[opt.shorthand] = name
+            self[name] = opt
 
         # Now find out what the obj is and use it to update the
         # flag data
-        if obj is None: # this is the most likly case
+        if obj is None:  # this is the most likly case
             return
         elif isinstance(obj, _FunctionMeta):
             pass
@@ -185,8 +183,9 @@ class FlagSet:
 
     @property
     def _help(self):
-        l = self.format_len
-        return '\n'.join(['    {0:<{1}}'.format(f, l) for f in self.visible_flags()])
+        fmt = '    {0:<{1}}'
+        lngth = self.format_len
+        return '\n'.join([fmt.format(f, lngth) for f in self.visible_flags()])
 
     def __str__(self):
         return self._help
@@ -196,7 +195,7 @@ class FlagSet:
 
     def __getitem__(self, key):
         if len(key) == 1 and key in self._shorthands:
-                key = self._shorthands[key]
+            key = self._shorthands[key]
         return self._flags[key]
 
     def __setitem__(self, key: str, flag: Option):
@@ -237,7 +236,7 @@ class FlagSet:
             return default
 
     def visible_flags(self):
-        for name, flag in self._flags.items():
+        for flag in self._flags.values():
             if flag.hidden:
                 continue
             yield flag
@@ -249,6 +248,7 @@ def _from_typing_module(t) -> bool:
         mod = t.__module__
         return sys.modules[mod] == typing
     return False
+
 
 def _is_iterable(t) -> bool:
     if _from_typing_module(t):

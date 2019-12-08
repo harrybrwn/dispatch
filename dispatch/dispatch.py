@@ -13,10 +13,9 @@
 # limitations under the License.
 
 import sys
-import types
 import jinja2
 
-from .flags import Option, FlagSet
+from .flags import FlagSet
 from ._funcmeta import _FunctionMeta
 from .exceptions import UserException, DeveloperException, RequiredFlagError
 
@@ -34,17 +33,6 @@ Options:
     {%- if flg.has_default %}{{ flg.show_default() }}{% endif %}
 {%- endfor %}
 '''
-
-
-class _Command:
-    '''Command Base class'''
-    def __init__(self, callback, meta: _FunctionMeta):
-        '''
-        callback: callable object that will be run when command is executed.
-        meta: meta information an the callback object
-        '''
-        self.callback = callback
-        self._meta = meta
 
 
 class Command:
@@ -102,8 +90,8 @@ class Command:
         self.help_template = kwrgs.get('help_template', HELP_TMPL)
         self.doc_help = kwrgs.get('doc_help', False)
         self.allow_null = kwrgs.get('allow_null', True)
-        hidden = kwrgs.get('hidden', set())
 
+        hidden = kwrgs.get('hidden', set())
         shorthands.update(kwrgs.get('shorthands', {}))
         docs.update(kwrgs.get('docs', {}))
         defaults.update(kwrgs.get('defaults', {}))
@@ -209,6 +197,7 @@ class Command:
             values[name] = flag.value
         return values
 
+
 def parse_doc(docstr: str) -> tuple:
     if docstr is None:
         return '', {}
@@ -263,7 +252,6 @@ def command(_fn=None, **kwrgs):
 
     # being called without parens as @command
     return cmd(_fn)
-
 
 
 def handle(fn):

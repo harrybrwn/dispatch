@@ -5,7 +5,6 @@ from dispatch import dispatch
 from dispatch.flags import _from_typing_module, _is_iterable
 
 from typing import List, Set, Dict, Sequence, Mapping
-from dataclasses import dataclass
 
 
 @dispatch.command(hidden={'debug'})
@@ -20,6 +19,7 @@ def some_cli(file: str, verbose: bool, time: str = 'local',
     :o output:  Give the program an output file
     '''
     pass
+
 
 class TestCommand(unittest.TestCase):
     class FlagType:
@@ -333,20 +333,5 @@ class TestHelpers(unittest.TestCase):
         self.assertFalse(_from_typing_module(A))
 
 
-@dataclass
-class SomeFlagSet:
-    name: str
-    verbose: bool
-
-
 if __name__ == '__main__':
     unittest.main()
-
-    f = SomeFlagSet('harry', True)
-    # f2 = FlagSet("jim", False)
-    print(dir(f))
-    print()
-    fields = f.__dataclass_fields__
-    print(fields)
-    # print(c)
-    print(getattr(f, 'name'))
