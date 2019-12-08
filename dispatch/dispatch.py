@@ -13,12 +13,14 @@
 # limitations under the License.
 
 import sys
-from collections.abc import Iterable
 import types
+from dataclasses import is_dataclass
 import typing
 import jinja2
 
-__all__ = ['Command', 'UserException', 'helptext', 'command', 'handle']
+from dispatch.flags import Option, FlagSet
+from ._funcmeta import _FunctionMeta
+from .exceptions import UserException, DeveloperException, RequiredFlagError
 
 
 HELP_TMPL = '''{%- if main_doc -%}
@@ -34,37 +36,6 @@ Options:
     {%- if flg.has_default %}{{ flg.show_default() }}{% endif %}
 {%- endfor %}
 '''
-
-
-class _FunctionMeta:
-    '''Not a metaclass, the 'meta' means 'meta-data'.'''
-    def __init__(self, obj, name=None, doc=None,
-                 code=None, defaults=None, annotations=None):
-        if isinstance(obj, (classmethod, staticmethod)):
-            self._cmd_obj = obj.__func__
-            self._params_start = 1
-        elif isinstance(obj, types.MethodType):
-            self._cmd_obj = obj
-            self._params_start = 1
-        else:
-            self._cmd_obj = obj
-            self._params_start = 0
-
-        self._func = self._cmd_obj.__call__
-        self.name = name or self._cmd_obj.__name__
-        self.doc = doc or self._cmd_obj.__doc__
-        self.code = code or obj.__code__
-        self._defaults = defaults or self._cmd_obj.__defaults__
-        self.annotations = annotations or self._cmd_obj.__defaults__
-
-    def params(self):
-        v = self.code.co_varnames
-        return v[self._params_start:self.code.co_argcount]
-
-    def defaults(self) -> dict:
-        args = reversed(self.params())
-        defs = reversed(self._defaults or [])
-        return dict(zip(args, defs))
 
 
 class _Command:
@@ -119,7 +90,7 @@ class Command:
         if not callable(self.callback):
             raise DeveloperException('Command callback needs to be callable')
 
-        meta = _FunctionMeta(
+        self._meta = _FunctionMeta(
             self.callback,
             name=self.callback.__name__,
             doc=self.callback.__doc__,
@@ -128,34 +99,33 @@ class Command:
             annotations=self.callback.__annotations__
         )
 
-        self.flagnames = meta.params()
-        self.defaults = meta.defaults()
-        self.name = meta.name
+        self.flagnames = self._meta.params()
+        self.defaults = self._meta.defaults()
+        self.name = self._meta.name
 
-        self._help, flagdoc = parse_doc(meta.doc)
+        self._help, flagdoc = parse_doc(self._meta.doc)
         self.shorthands = {}
         self.docs = {}
         for key, val in flagdoc.items():
             self.shorthands[key] = val.get('shorthand')
             self.docs[key] = val.get('doc')
 
-        self._help = kwrgs.get('help') or self._help
-        self.help_template = kwrgs.get('help_template') or HELP_TMPL
-        self.hidden = kwrgs.get('hidden') or set()
-        self.doc_help = kwrgs.get('doc_help') or False
-        self.allow_null = kwrgs.get('allow_null') or True
+        self._help = kwrgs.get('help', self._help)
+        self.help_template = kwrgs.get('help_template', HELP_TMPL)
+        self.hidden = kwrgs.get('hidden', set())
+        self.doc_help = kwrgs.get('doc_help', False)
+        self.allow_null = kwrgs.get('allow_null', True)
 
-        self.shorthands.update(kwrgs.get('shorthands') or {})
-        self.docs.update(kwrgs.get('docs') or {})
-        self.defaults.update(kwrgs.get('defaults') or {})
+        self.shorthands.update(kwrgs.get('shorthands', {}))
+        self.docs.update(kwrgs.get('docs', {}))
+        self.defaults.update(kwrgs.get('defaults', {}))
 
         self.args = []
         self.flags = self._find_flags()
 
         # checking the Command settings for validity
         # raises error if there is an invalid setting
-        check_names = kwrgs.get('check_names')
-        check_names = True if check_names is None else check_names
+        check_names = kwrgs.get('check_names', True)
         if check_names:
             self._check_flag_settings()
 
@@ -166,10 +136,10 @@ class Command:
             return self.help()
 
         fn_args = self.parse_args(argv)
-        return self.callback.__call__(**fn_args)
+        return self._meta.run(**fn_args)
 
     def __repr__(self):
-        return f'{self.__class__.__name__}({self.callback.__name__}())'
+        return f'{self.__class__.__name__}({self._meta.name}())'
 
     def __str__(self):
         return self.helptext()
@@ -208,7 +178,7 @@ class Command:
         for name in self.flagnames:
             opt = Option(
                 name,
-                self.callback.__annotations__.get(name),
+                self._meta.annotations.get(name),
                 shorthand=self.shorthands.get(name),
                 help=self.docs.get(name),
                 value=self.defaults.get(name),
@@ -242,7 +212,7 @@ class Command:
                 continue
             yield name, flag
 
-    def visible_flags(self) -> list:
+    def visible_flags(self):
         helpflag = Option('help', bool, shorthand='h', help='Get help.')
         for name, flag in self.flags.items():
             if (len(name) == 1 and flag.shorthand) or flag.hidden:
@@ -307,107 +277,6 @@ class Command:
             values[name] = flag.value
         return values
 
-
-class Option:
-    def __init__(self, name, typ, *,
-                 shorthand=None, help=None, value=None,
-                 hidden=None, has_default=None):
-        self.name = name
-        self.type = typ or bool
-        self.shorthand = shorthand
-        self.help = help
-        self.value = value
-        self.has_default = has_default
-        self.hidden = hidden if hidden is not None else False
-        self.f_len = len(self.name)  # temp value, should be set later
-
-        if self.shorthand == 'h' and self.name != 'help':
-            raise DeveloperException(
-                "cannot use 'h' as shorthand (reserved for --help)")
-
-    def __format__(self, spec):
-        return '{short}--{name:{0}}{help}'.format(
-            f'<{self.f_len}' if not spec else spec,
-            short=f'-{self.shorthand}, ' if self.shorthand else ' ' * 4,
-            name=self.name.replace('_', '-'),
-            help=self.help or '')
-
-    @property
-    def value(self):
-        return self._value
-
-    @value.setter
-    def value(self, val):
-        self._value = val
-        if val is not None:
-            self.type = val.__class__
-
-    def show_default(self) -> str:
-        if not self.has_default:
-            return ''
-        elif self.type is not bool and self.value:
-            return f'(default: {self.value})'
-        elif self.type is bool:
-            return f'(default: {self.value})'
-        return ''
-
-    def setval(self, val):
-        '''
-        setval is meant to be used to set the value of the flag from the
-        cli input and convert it to the flag's type. setval should work
-        when the flag.type is a compound type annotation (see typing package).
-
-        This function is basically a rich type convertion. Any flag types that
-        are part of the typing package will be converted to the python type it
-        represents.
-        '''
-        # TODO: type checking does not work if the annotation is an abstract
-        #       base class. (collections.abc.Sequence etc..)
-
-        if not isinstance(val, str) or self.type is str:
-            # if val is not a string then the type has already been converted
-            self._value = val
-        else:
-            if _is_iterable(self.type) and self.type is not str:
-                val = val.strip('[]{}').split(',')
-
-            if self.type is str:
-                self._value = val
-            elif _from_typing_module(self.type):
-                if len(self.type.__args__) == 1:
-                    inner = self.type.__args__[0]
-                    self._value = self.type.__origin__([inner(v) for v in val])
-                elif len(self.type.__args__) == 2:
-                    key_tp, val_tp = self.type.__args__
-                    vals = []
-                    for vl in val:
-                        k, v = vl.split(':')
-                        pair = key_tp(k), val_tp(v)
-                        vals.append(pair)
-                    self._value = self.type.__origin__(vals)
-            else:
-                self._value = self.type(val)
-
-    def __repr__(self):
-        return "{}('{}', {})".format(
-            self.__class__.__name__, str(self), self.type)
-
-    def __str__(self):
-        if self.shorthand:
-            return '-{}, --{}'.format(self.shorthand, self.name)
-        else:
-            return '     --{}'.format(self.name)
-
-    def __len__(self):
-        '''Get the length of the option name when formatted in the help text
-        eg. same as `len('-v, --verbose') or `len('    --verbose')``
-        '''
-        length = len(self.name) + 2  # plus len of '--'
-        if self.shorthand:
-            length += 4  # length of '-v, ' if v is the shorthand
-        return length
-
-
 def parse_doc(docstr: str) -> tuple:
     if docstr is None:
         return '', {}
@@ -421,18 +290,6 @@ def parse_doc(docstr: str) -> tuple:
 
     doc = '\n'.join([l.strip() for l in desc.split('\n') if l])
     return doc.strip(), flags
-
-
-class UserException(Exception):
-    pass
-
-
-class DeveloperException(Exception):
-    pass
-
-
-class RequiredFlagError(UserException):
-    pass
 
 
 def _parse_flags_doc(doc: str):
@@ -460,27 +317,21 @@ def _parse_flags_doc(doc: str):
     return res
 
 
-def _from_typing_module(t) -> bool:
-    if hasattr(t, '__module__'):
-        mod = t.__module__
-        return sys.modules[mod] == typing
-    return False
-
-
-def _is_iterable(t) -> bool:
-    if _from_typing_module(t):
-        return issubclass(t.__origin__, Iterable)
-    return isinstance(t, Iterable) or issubclass(t, Iterable)
-
-
 def helptext(fn):
     return Command(fn).helptext()
 
 
-def command(**kwrgs):
-    def runner(fn):
+def command(_fn=None, **kwrgs):
+    def cmd(fn):
         return Command(fn, **kwrgs)
-    return runner
+
+    # command is being called with parens as @command(...)
+    if _fn is None:
+        return cmd
+
+    # being called without parens as @command
+    return cmd(_fn)
+
 
 
 def handle(fn):

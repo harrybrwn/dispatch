@@ -2,6 +2,10 @@
 
 import unittest
 from dispatch import dispatch
+from dispatch.flags import _from_typing_module, _is_iterable, Option, FlagSet
+
+from typing import List, Set, Dict, Sequence, Mapping
+from dataclasses import dataclass
 
 
 class TestCommand(unittest.TestCase):
@@ -26,7 +30,7 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(len(cmd.flags), 0)
         self.assertEqual(cmd.name, 'fn')
 
-        @dispatch.command()
+        @dispatch.command
         def run(): pass
         run()
 
@@ -95,7 +99,7 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(cmd.flags['l'].name, 'hello')
         self.assertIn('-l, --hello', cmd.helptext())
 
-        @dispatch.command()
+        @dispatch.command
         def fn2(verbose: bool, hello):
             ''':l hello: say hello'''
         self.assertIn('-l, --hello', fn2.helptext())
@@ -126,7 +130,7 @@ class TestCommand(unittest.TestCase):
         cmd.run(['--name=joe'])
         cmd.run(['-n=joe'])
 
-        @dispatch.command()
+        @dispatch.command
         def fn(name: str):
             '''
             :n name: give the program a name
@@ -141,7 +145,6 @@ class TestCommand(unittest.TestCase):
         self.assertTrue(r == 2)
         r = fn(['-n=joe'])
         self.assertTrue(r == 2)
-        # print(fn._flaghelp)
 
         @dispatch.command()
         def fn(multi_word_flag, bool_flag: bool):
@@ -207,12 +210,12 @@ class TestCommand(unittest.TestCase):
             print('staticmethod command')
 
     def testMeta(self):
-        from dispatch.dispatch import _FunctionMeta
+        self.skipTest('this feature isnt finished')
         SomeClass = TestCommand.SomeClass
         sc = SomeClass()
         funcs = [sc.cmd, sc.class_cmd, sc.static_cmd, SomeClass.static_cmd]
         for f in funcs:
-            m = _FunctionMeta(f)
+            m = dispatch.dispatch._FunctionMeta(f)
             self.assertEqual(m.params()[0], 'hello')
             self.assertEqual(m.name, f.__name__)
             self.assertEqual(m.doc, f.__doc__)
@@ -221,8 +224,6 @@ class TestCommand(unittest.TestCase):
 class TestOptions(unittest.TestCase):
 
     def testTypeParsing(self):
-        from typing import List, Set, Dict
-
         o = dispatch.Option('o', List[int])
         o.setval('[1,2,3,4]')
         self.assertTrue(isinstance(o.value, list))
@@ -257,8 +258,6 @@ class TestOptions(unittest.TestCase):
             self.assertTrue(isinstance(v, int))
 
     def testBadTypeParsing(self):
-        from typing import Dict
-
         o = dispatch.Option('outout', Dict[str, float])
         self.assertRaises(
             ValueError, o.setval,
@@ -293,8 +292,6 @@ class TestOptions(unittest.TestCase):
 
 class TestHelpers(unittest.TestCase):
     def testIsIterable(self):
-        from typing import List, Dict, Sequence, Mapping
-        from dispatch.dispatch import _is_iterable
         self.assertTrue(_is_iterable(str))
         self.assertTrue(_is_iterable(list))
         self.assertTrue(_is_iterable(dict))
@@ -308,13 +305,10 @@ class TestHelpers(unittest.TestCase):
         self.assertFalse(_is_iterable(float))
         self.assertFalse(_is_iterable(A))
 
-        import inspect
-        inspect.isbuiltin
         self.assertTrue(_is_iterable([1, 2, 3]))
 
     def testFromTypingModule(self):
-        from dispatch.dispatch import _from_typing_module
-        from typing import List, Sequence, Dict
+
         self.assertTrue(_from_typing_module(List))
         self.assertTrue(_from_typing_module(Sequence))
         self.assertTrue(_from_typing_module(Dict[int, str]))
@@ -325,24 +319,25 @@ class TestHelpers(unittest.TestCase):
         self.assertFalse(_from_typing_module(A))
 
 
-def expiriments():
-    def func(name, *args): pass
-    # def func(name, *, args=None): pass
-    import inspect # noqa
-    from inspect import signature
+@dataclass
+class FlagSet:
+    name: str
+    verbose: bool
 
-    def lookat(x, prefix="_"):
-        for a in dir(x):
-            if not a.startswith(prefix):
-                attr = getattr(x, a)
-                print(a, attr, type(attr))
 
-    sig = signature(func)
-    args = sig.parameters['args']
-    print(args)
-    print(type(args))
-    lookat(args)
+@dispatch.command
+def c():
+    pass
 
 
 if __name__ == '__main__':
     unittest.main()
+
+    f = FlagSet('harry', True)
+    # f2 = FlagSet("jim", False)
+    print(dir(f))
+    print()
+    fields = f.__dataclass_fields__
+    print(fields)
+    # print(c)
+    print(getattr(f, 'name'))
