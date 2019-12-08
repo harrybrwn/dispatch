@@ -14,6 +14,7 @@
 
 import sys
 from collections.abc import Iterable
+import types
 import typing
 import jinja2
 
@@ -33,6 +34,48 @@ Options:
     {%- if flg.has_default %}{{ flg.show_default() }}{% endif %}
 {%- endfor %}
 '''
+
+
+class _FunctionMeta:
+    '''Not a metaclass, the 'meta' means 'meta-data'.'''
+    def __init__(self, obj, name=None, doc=None,
+                 code=None, defaults=None, annotations=None):
+        if isinstance(obj, (classmethod, staticmethod)):
+            self._cmd_obj = obj.__func__
+            self._params_start = 1
+        elif isinstance(obj, types.MethodType):
+            self._cmd_obj = obj
+            self._params_start = 1
+        else:
+            self._cmd_obj = obj
+            self._params_start = 0
+
+        self._func = self._cmd_obj.__call__
+        self.name = name or self._cmd_obj.__name__
+        self.doc = doc or self._cmd_obj.__doc__
+        self.code = code or obj.__code__
+        self._defaults = defaults or self._cmd_obj.__defaults__
+        self.annotations = annotations or self._cmd_obj.__defaults__
+
+    def params(self):
+        v = self.code.co_varnames
+        return v[self._params_start:self.code.co_argcount]
+
+    def defaults(self) -> dict:
+        args = reversed(self.params())
+        defs = reversed(self._defaults or [])
+        return dict(zip(args, defs))
+
+
+class _Command:
+    '''Command Base class'''
+    def __init__(self, callback, meta: _FunctionMeta):
+        '''
+        callback: callable object that will be run when command is executed.
+        meta: meta information an the callback object
+        '''
+        self.callback = callback
+        self._meta = meta
 
 
 class Command:
@@ -66,23 +109,35 @@ class Command:
                 function docs to see if they are valid flags.
         '''
         self.callback = callback
+        if isinstance(callback, types.MethodType):
+            self.callback = callback.__call__
+            # raise NotImplementedError("methods not supported yet")
+
+        if isinstance(callback, (staticmethod, classmethod)):
+            self.callback = callback.__func__
+
         if not callable(self.callback):
             raise DeveloperException('Command callback needs to be callable')
-        meta = self.callback.__code__
-        self.flagnames = meta.co_varnames[:meta.co_argcount]
-        self.name = self.callback.__name__
 
-        self._help, flagdoc = parse_doc(self.callback.__doc__)
+        meta = _FunctionMeta(
+            self.callback,
+            name=self.callback.__name__,
+            doc=self.callback.__doc__,
+            code=self.callback.__code__,
+            defaults=self.callback.__defaults__,
+            annotations=self.callback.__annotations__
+        )
+
+        self.flagnames = meta.params()
+        self.defaults = meta.defaults()
+        self.name = meta.name
+
+        self._help, flagdoc = parse_doc(meta.doc)
         self.shorthands = {}
         self.docs = {}
         for key, val in flagdoc.items():
             self.shorthands[key] = val.get('shorthand')
             self.docs[key] = val.get('doc')
-
-        self.defaults = dict(
-            zip(reversed(self.flagnames),
-                reversed(self.callback.__defaults__ or []))
-        )
 
         self._help = kwrgs.get('help') or self._help
         self.help_template = kwrgs.get('help_template') or HELP_TMPL
@@ -111,7 +166,7 @@ class Command:
             return self.help()
 
         fn_args = self.parse_args(argv)
-        return self.callback(**fn_args)
+        return self.callback.__call__(**fn_args)
 
     def __repr__(self):
         return f'{self.__class__.__name__}({self.callback.__name__}())'
@@ -124,7 +179,6 @@ class Command:
 
     @property
     def _flag_help(self):
-        fmt = '    {1:<{0}}'
         flags = list(self.visible_flags())
         flen = self._flag_lengths(flags)
         return '\n'.join(['    {1:<{0}}'.format(flen, f) for f in flags])

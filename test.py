@@ -26,6 +26,10 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(len(cmd.flags), 0)
         self.assertEqual(cmd.name, 'fn')
 
+        @dispatch.command()
+        def run(): pass
+        run()
+
     def testOptionTypes(self):
         def fn(a: str, b: int, c: bool, d: self.FlagType, pi=3.14159): pass
         cmd = dispatch.Command(fn)
@@ -81,10 +85,20 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(cmd.flags['t'].value, '')
         self.assertEqual(cmd.flags['t'], cmd.flags['tag'])
         self.assertEqual(id(cmd.flags['t']), id(cmd.flags['tag']))
-        print()
-        print(cmd._fmt_help)
-        print('\n\n')
-        cmd.help()
+
+    def testIncompleteDocParsing(self):
+        def fn(verbose: bool, hello):
+            ''':l hello: say hello'''
+            pass
+        cmd = dispatch.Command(fn)
+        self.assertTrue(cmd.flags['l'] is not None)
+        self.assertEqual(cmd.flags['l'].name, 'hello')
+        self.assertIn('-l, --hello', cmd.helptext())
+
+        @dispatch.command()
+        def fn2(verbose: bool, hello):
+            ''':l hello: say hello'''
+        self.assertIn('-l, --hello', fn2.helptext())
 
     def testBadDoc(self):
         def f1(verbose: bool): pass
@@ -176,6 +190,33 @@ class TestCommand(unittest.TestCase):
     def testFormat(self):
         pass
 
+    class SomeClass:
+        def cmd(self, hello):
+            ''':hello: say hello'''
+            print('method command')
+            print(self)
+
+        @classmethod
+        def class_cmd(cls, hello):
+            ''':hello: say hello'''
+            print('classmethod command')
+
+        @staticmethod
+        def static_cmd(hello):
+            ''':hello: say hello'''
+            print('staticmethod command')
+
+    def testMeta(self):
+        from dispatch.dispatch import _FunctionMeta
+        SomeClass = TestCommand.SomeClass
+        sc = SomeClass()
+        funcs = [sc.cmd, sc.class_cmd, sc.static_cmd, SomeClass.static_cmd]
+        for f in funcs:
+            m = _FunctionMeta(f)
+            self.assertEqual(m.params()[0], 'hello')
+            self.assertEqual(m.name, f.__name__)
+            self.assertEqual(m.doc, f.__doc__)
+
 
 class TestOptions(unittest.TestCase):
 
@@ -239,7 +280,6 @@ class TestOptions(unittest.TestCase):
                 'name', str, help='the name'),
         ]
         l = max([len(o.name)+2 for o in opts]) # noqa
-
 
     # def testFormat(self):
     #     o = dispatch.Option(

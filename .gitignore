@@ -1,9 +1,10 @@
-# Dirs
+# Testing
+/benchmarks/
+
+# Dev
 __pycache__/
 /.vscode/
 
 # Misc.
 example.py
-docs.py
-doc
 TODO
