@@ -6,17 +6,20 @@ from dataclasses import is_dataclass
 from .exceptions import DeveloperException
 from ._funcmeta import _FunctionMeta
 
+
 class Option:
     def __init__(self, name, typ, *,
                  shorthand=None, help=None, value=None,
                  hidden=None, has_default=None):
         self.name = name
         self.type = typ or bool
+
         self.shorthand = shorthand
-        self.help = help
-        self.value = value
-        self.has_default = has_default
+        self.help = help or ''
+        self.value = value # will infer and set the type
+
         self.hidden = hidden if hidden is not None else False
+        self.has_default = has_default or value is not None
         self.f_len = len(self.name)  # temp value, should be set later
 
         if self.shorthand == 'h' and self.name != 'help':
@@ -24,11 +27,40 @@ class Option:
                 "cannot use 'h' as shorthand (reserved for --help)")
 
     def __format__(self, spec):
+        if spec:
+            if spec[0] == '<' or spec[0] == '>':
+                name_spec = spec
+        else:
+            name_spec = f'<{self.f_len}'
+
+        if self.shorthand:
+            short = f'-{self.shorthand}, '
+        else:
+            short = ' ' * 4
+
         return '{short}--{name:{0}}{help}'.format(
-            f'<{self.f_len}' if not spec else spec,
-            short=f'-{self.shorthand}, ' if self.shorthand else ' ' * 4,
+            name_spec, short=short,
             name=self.name.replace('_', '-'),
-            help=self.help or '')
+            help=self.help)
+
+    def __repr__(self):
+        return "{}('{}', {})".format(
+            self.__class__.__name__, str(self).strip(), self.type)
+
+    def __str__(self):
+        if self.shorthand:
+            return '-{}, --{}'.format(self.shorthand, self.name)
+        else:
+            return '     --{}'.format(self.name)
+
+    def __len__(self):
+        '''Get the length of the option name when formatted in the help text
+        eg. same as `len('-v, --verbose') or `len('    --verbose')``
+        '''
+        length = len(self.name) + 2  # plus len of '--'
+        if self.shorthand:
+            length += 4  # length of '-v, ' if v is the shorthand
+        return length
 
     @property
     def value(self):
@@ -89,48 +121,39 @@ class Option:
             else:
                 self._value = self.type(val)
 
-    def __repr__(self):
-        return "{}('{}', {})".format(
-            self.__class__.__name__, str(self), self.type)
-
-    def __str__(self):
-        if self.shorthand:
-            return '-{}, --{}'.format(self.shorthand, self.name)
-        else:
-            return '     --{}'.format(self.name)
-
-    def __len__(self):
-        '''Get the length of the option name when formatted in the help text
-        eg. same as `len('-v, --verbose') or `len('    --verbose')``
-        '''
-        length = len(self.name) + 2  # plus len of '--'
-        if self.shorthand:
-            length += 4  # length of '-v, ' if v is the shorthand
-        return length
-
 
 class FlagSet:
     '''A Set of cli Flags'''
 
     DEFAULT_HELP_FLAG = Option('help', bool, shorthand='h', help='Get help.')
+    MIN_FMT_LEN = 3
 
     def __init__(self, *, obj=None, names: list = None,
                  defaults: dict = None, docs: dict = None,
-                 shorhands: dict = None):
+                 shorthands: dict = None, types: dict = None,
+                 hidden: set = None):
         '''
         Create a FlagSet
 
-            obj:      create a new FlagSet from an object (usually a dataclass)
-            names:    `list` of flag names, use only the fullnames
-            defaults: `dict` of default flag values
-            docs:     `dict` of default flag help text
-            types:    `dict` of type annotations
+            obj:        create a new FlagSet from an object (usually a dataclass)
+            names:      `list` of flag names, use only the fullnames
+            defaults:   `dict` of default flag values
+            docs:       `dict` of default flag help text
+            types:      `dict` of type annotations
+            shorthands: `dict` of flag shorthands. Give it in the format
+                        {<flagname>: <shorthand>} but know that the copy
+                        stored in the flag set will also store flagnames in
+                        the format {<shorthand>: <flagname>}.
+            hidden:     `set` of the flagnames that will be hidden from the
+                        help text of the FlagSet.
         '''
         self._flags = {}
         self._flagnames = names or []
-        self._shorthands = shorhands or {}
+        self._shorthands = shorthands.copy() if shorthands else {}
         self._defaults = defaults or {}
         self._docs = docs or {}
+        self._types = types or {}
+        self._hidden = hidden or set()
 
         # Now find out what the obj is and use it to update the
         # flag data
@@ -140,30 +163,76 @@ class FlagSet:
             pass
         elif is_dataclass(obj):
             pass
+        elif isinstance(obj, FlagSet):
+            self.update(obj)
+
+    @property
+    def format_len(self) -> int:
+        fmt_len = max([len(f.name) for f in self.visible_flags()])
+        return fmt_len + self.MIN_FMT_LEN
+
+    @property
+    def _help(self):
+        flags = list(self.visible_flags())
+        l = self.format_len
+        return '\n'.join(['    {0:<{1}}'.format(f, l) for f in flags])
+
+    def _init_flags(self):
+        for name in self._flagnames:
+            opt = Option(
+                name,
+                self._types.get(name, bool),
+                shorthand=self._shorthands.get(name),
+                help=self._docs.get(name),
+                value=self._defaults.get(name),
+                hidden=name in self._hidden,
+            )
+            self._flags[name] = opt
+            if opt.shorthand:
+                self._shorthands[opt.shorthand] = name
+
+    def __str__(self):
+        return self._help
 
     def __getitem__(self, key):
         if len(key) == 1:
             key = self._shorthands[key]
         return self._flags[key]
 
-    def __setitem__(self, key, flag):
+    def __setitem__(self, key: str, flag: Option):
         self._flags[key] = flag
         if flag.shorthand:
             self._shorthands[flag.shorthand] = key
 
     def __delitem__(self, key):
-        raise NotImplementedError
+        if len(key) == 1:
+            key = self._shorthands.pop(key)
+        del self._flags[key]
 
     def __contains__(self, key):
         return key in self._flags or key in self._shorthands
+
+    def __iter__(self):
+        return iter(self._flags)
 
     def items(self):
         for name, flag in self._flags.items():
             yield name, flag
 
+    def values(self):
+        for flag in self._flags.values():
+            yield flag
+
+    def update(self, fset):
+        if not isinstance(fset, FlagSet):
+            raise TypeError(
+                'must update {0} with a {0}'.format(self.__class__.__name__))
+        self._flags.update(fset._flags)
+        self._shorthands.update(fset._shorthands)
+
     def visible_flags(self):
         for name, flag in self.flags.items():
-            if (len(name) == 1 and flag.shorthand) or flag.hidden:
+            if flag.hidden:
                 continue
             yield flag
         yield self.DEFAULT_HELP_FLAG

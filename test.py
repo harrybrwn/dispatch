@@ -2,11 +2,24 @@
 
 import unittest
 from dispatch import dispatch
-from dispatch.flags import _from_typing_module, _is_iterable, Option, FlagSet
+from dispatch.flags import _from_typing_module, _is_iterable
 
 from typing import List, Set, Dict, Sequence, Mapping
 from dataclasses import dataclass
 
+
+@dispatch.command(hidden={'debug'})
+def some_cli(file: str, verbose: bool, time: str = 'local',
+             debug: bool = False, output: str = 'stdout'):
+    '''Some_cli is just some generic cli tool
+    that has a multi-line description.
+
+    :f file:    Give the cli a file
+    :v verbose: Print out all the information to stdout
+    :time:      Use some other time
+    :o output:  Give the program an output file
+    '''
+    pass
 
 class TestCommand(unittest.TestCase):
     class FlagType:
@@ -14,6 +27,9 @@ class TestCommand(unittest.TestCase):
             self.name = name
 
     EMPTY_HELP = expected = 'Usage:\n    {name} [options]\n\nOptions:\n    -h, --help   Get help.' # noqa
+
+    def testGeneralCommand(self):
+        self.assertTrue(some_cli is not None)
 
     def testCommand(self):
         def fn(arg1, arg2): pass
@@ -173,7 +189,7 @@ class TestCommand(unittest.TestCase):
         @dispatch.command(shorthands={'debug': 'd'},
                           help="f2 is a test command")
         def f2(debug: bool = False):
-            self.assertTrue(len(f2.shorthands) == 1)
+            self.assertEqual(len(f2.shorthands), 1)
             self.assertTrue(debug)
             return 'what???'
         val = f2(['-d'])
@@ -222,6 +238,24 @@ class TestCommand(unittest.TestCase):
 
 
 class TestOptions(unittest.TestCase):
+
+    def testFlagSet(self):
+        c = some_cli
+        fset = dispatch.FlagSet(
+            names=list(c.flagnames),
+            defaults=c.defaults.copy(),
+            docs=c.docs.copy(),
+            shorthands=c.shorthands.copy(),
+            types=c.callback.__annotations__.copy(),
+            hidden=c.hidden.copy(),
+        )
+        fset._init_flags()
+
+        for name, flag in c.flags.items():
+            self.assertIn(name, fset)
+            self.assertEqual(fset[name].name, c.flags[name].name)
+            self.assertEqual(fset[name].help, c.flags[name].help)
+            self.assertEqual(fset[name].type, c.flags[name].type)
 
     def testTypeParsing(self):
         o = dispatch.Option('o', List[int])
@@ -320,20 +354,15 @@ class TestHelpers(unittest.TestCase):
 
 
 @dataclass
-class FlagSet:
+class SomeFlagSet:
     name: str
     verbose: bool
-
-
-@dispatch.command
-def c():
-    pass
 
 
 if __name__ == '__main__':
     unittest.main()
 
-    f = FlagSet('harry', True)
+    f = SomeFlagSet('harry', True)
     # f2 = FlagSet("jim", False)
     print(dir(f))
     print()

@@ -14,11 +14,9 @@
 
 import sys
 import types
-from dataclasses import is_dataclass
-import typing
 import jinja2
 
-from dispatch.flags import Option, FlagSet
+from .flags import Option, FlagSet
 from ._funcmeta import _FunctionMeta
 from .exceptions import UserException, DeveloperException, RequiredFlagError
 
@@ -80,13 +78,6 @@ class Command:
                 function docs to see if they are valid flags.
         '''
         self.callback = callback
-        if isinstance(callback, types.MethodType):
-            self.callback = callback.__call__
-            # raise NotImplementedError("methods not supported yet")
-
-        if isinstance(callback, (staticmethod, classmethod)):
-            self.callback = callback.__func__
-
         if not callable(self.callback):
             raise DeveloperException('Command callback needs to be callable')
 
@@ -182,7 +173,7 @@ class Command:
                 shorthand=self.shorthands.get(name),
                 help=self.docs.get(name),
                 value=self.defaults.get(name),
-                hidden=True if name in self.hidden else False,
+                hidden=name in self.hidden,
                 has_default=name in self.defaults
             )
             flags[name] = opt
