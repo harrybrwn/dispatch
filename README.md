@@ -52,7 +52,7 @@ All boolean flags have a default of `False`.
 
 A positional argument with no default and no type annotation is assumed to be a boolean flag and will default to a value of `False`.
 ```python
-@disptch.command()
+@disptch.command
 def cli(verbose):
     if verbose:
         print('the verbose flag has been given')
@@ -64,7 +64,7 @@ Type annotations
 ----------------
 However, if a positional argument is given a type annotation that isn't `bool`, the user will get an error if the do not give that flag.
 ```python
-@despatch.command()
+@despatch.command
 def cli(name: str):
     print('hello, ' + name)
 

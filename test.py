@@ -84,8 +84,7 @@ class TestCommand(unittest.TestCase):
         cmd = dispatch.Command(fn)
         self.assertEqual(
             cmd._help, "fn is a function\nthat has a multi-line description.")
-        self.assertEqual(len(cmd.flags), 5)
-        self.assertEqual(len(cmd._named_flags()), 3)
+        self.assertEqual(len(cmd.flags), 3)
         f = cmd.flags['verbose']
         self.assertEqual(f.name, 'verbose')
         self.assertEqual(f.shorthand, 'v')
@@ -154,13 +153,13 @@ class TestCommand(unittest.TestCase):
             self.assertEqual(name, 'joe')
             return len(fn.flags)
         r = fn(['--name', 'joe'])
-        self.assertTrue(r == 2)
+        self.assertTrue(r == 1)
         r = fn(['-n', 'joe'])
-        self.assertTrue(r == 2)
+        self.assertTrue(r == 1)
         r = fn(['--name=joe'])
-        self.assertTrue(r == 2)
+        self.assertTrue(r == 1)
         r = fn(['-n=joe'])
-        self.assertTrue(r == 2)
+        self.assertTrue(r == 1)
 
         @dispatch.command()
         def fn(multi_word_flag, bool_flag: bool):
@@ -179,8 +178,8 @@ class TestCommand(unittest.TestCase):
             self.assertEqual(exp, got)
             self.assertTrue(verbose)
             self.assertFalse(debug)
-            self.assertTrue(len(f1.hidden) == 2)
-            self.assertTrue(len(f1.defaults) == 1)
+            # self.assertTrue(len(f1.hidden) == 2)
+            # self.assertTrue(len(f1.defaults) == 1)
             return 76
         val = f1(['-v'])
         self.assertEqual(val, 76)
@@ -189,7 +188,6 @@ class TestCommand(unittest.TestCase):
         @dispatch.command(shorthands={'debug': 'd'},
                           help="f2 is a test command")
         def f2(debug: bool = False):
-            self.assertEqual(len(f2.shorthands), 1)
             self.assertTrue(debug)
             return 'what???'
         val = f2(['-d'])
@@ -238,24 +236,6 @@ class TestCommand(unittest.TestCase):
 
 
 class TestOptions(unittest.TestCase):
-
-    def testFlagSet(self):
-        c = some_cli
-        fset = dispatch.FlagSet(
-            names=list(c.flagnames),
-            defaults=c.defaults.copy(),
-            docs=c.docs.copy(),
-            shorthands=c.shorthands.copy(),
-            types=c.callback.__annotations__.copy(),
-            hidden=c.hidden.copy(),
-        )
-        fset._init_flags()
-
-        for name, flag in c.flags.items():
-            self.assertIn(name, fset)
-            self.assertEqual(fset[name].name, c.flags[name].name)
-            self.assertEqual(fset[name].help, c.flags[name].help)
-            self.assertEqual(fset[name].type, c.flags[name].type)
 
     def testTypeParsing(self):
         o = dispatch.Option('o', List[int])

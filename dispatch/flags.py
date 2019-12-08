@@ -27,19 +27,23 @@ class Option:
                 "cannot use 'h' as shorthand (reserved for --help)")
 
     def __format__(self, spec):
+        name_spec = f'<{self.f_len}'
+        prefix = ''
         if spec:
-            if spec[0] == '<' or spec[0] == '>':
-                name_spec = spec
-        else:
-            name_spec = f'<{self.f_len}'
+            if '<' in spec:
+                name_spec = '<' + spec[spec.index('<') + 1]
+            elif '>' in spec:
+                name_spec = '>' + spec[spec.index('>') + 1]
+            if '+' in spec:
+                prefix = ' ' * int(spec[spec.index('+')+1])
 
         if self.shorthand:
             short = f'-{self.shorthand}, '
         else:
             short = ' ' * 4
 
-        return '{short}--{name:{0}}{help}'.format(
-            name_spec, short=short,
+        return '{0}{short}--{name:{1}}{help}'.format(
+            prefix, name_spec, short=short,
             name=self.name.replace('_', '-'),
             help=self.help)
 
@@ -149,11 +153,19 @@ class FlagSet:
         '''
         self._flags = {}
         self._flagnames = names or []
-        self._shorthands = shorthands.copy() if shorthands else {}
-        self._defaults = defaults or {}
-        self._docs = docs or {}
-        self._types = types or {}
-        self._hidden = hidden or set()
+        self._shorthands = {}
+
+        for name in self._flagnames:
+            opt = Option(
+                name, types.get(name, bool),
+                shorthand=shorthands.get(name),
+                help=docs.get(name),
+                value=defaults.get(name),
+                hidden=name in hidden,
+            )
+            self._flags[name] = opt
+            if opt.shorthand:
+                self._shorthands[opt.shorthand] = name
 
         # Now find out what the obj is and use it to update the
         # flag data
@@ -173,30 +185,18 @@ class FlagSet:
 
     @property
     def _help(self):
-        flags = list(self.visible_flags())
         l = self.format_len
-        return '\n'.join(['    {0:<{1}}'.format(f, l) for f in flags])
-
-    def _init_flags(self):
-        for name in self._flagnames:
-            opt = Option(
-                name,
-                self._types.get(name, bool),
-                shorthand=self._shorthands.get(name),
-                help=self._docs.get(name),
-                value=self._defaults.get(name),
-                hidden=name in self._hidden,
-            )
-            self._flags[name] = opt
-            if opt.shorthand:
-                self._shorthands[opt.shorthand] = name
+        return '\n'.join(['    {0:<{1}}'.format(f, l) for f in self.visible_flags()])
 
     def __str__(self):
         return self._help
 
+    def __len__(self):
+        return len(self._flags)
+
     def __getitem__(self, key):
-        if len(key) == 1:
-            key = self._shorthands[key]
+        if len(key) == 1 and key in self._shorthands:
+                key = self._shorthands[key]
         return self._flags[key]
 
     def __setitem__(self, key: str, flag: Option):
@@ -230,8 +230,14 @@ class FlagSet:
         self._flags.update(fset._flags)
         self._shorthands.update(fset._shorthands)
 
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
     def visible_flags(self):
-        for name, flag in self.flags.items():
+        for name, flag in self._flags.items():
             if flag.hidden:
                 continue
             yield flag

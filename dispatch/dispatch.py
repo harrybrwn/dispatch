@@ -73,9 +73,6 @@ class Command:
                 to have a value of None. This would mean that none of the
                 command's flags are required.
             allow_null (bool):  If True (default is True), flags are allowed
-            check_names (bool): If True (default is True), the Command will
-                check all the flag names given in any command settings or
-                function docs to see if they are valid flags.
         '''
         self.callback = callback
         if not callable(self.callback):
@@ -90,35 +87,36 @@ class Command:
             annotations=self.callback.__annotations__
         )
 
-        self.flagnames = self._meta.params()
-        self.defaults = self._meta.defaults()
         self.name = self._meta.name
-
+        self.flagnames = self._meta.params()
         self._help, flagdoc = parse_doc(self._meta.doc)
-        self.shorthands = {}
-        self.docs = {}
+
+        defaults = self._meta.defaults()
+        shorthands = {}
+        docs = {}
         for key, val in flagdoc.items():
-            self.shorthands[key] = val.get('shorthand')
-            self.docs[key] = val.get('doc')
+            shorthands[key] = val.get('shorthand')
+            docs[key] = val.get('doc')
 
         self._help = kwrgs.get('help', self._help)
         self.help_template = kwrgs.get('help_template', HELP_TMPL)
-        self.hidden = kwrgs.get('hidden', set())
         self.doc_help = kwrgs.get('doc_help', False)
         self.allow_null = kwrgs.get('allow_null', True)
+        hidden = kwrgs.get('hidden', set())
 
-        self.shorthands.update(kwrgs.get('shorthands', {}))
-        self.docs.update(kwrgs.get('docs', {}))
-        self.defaults.update(kwrgs.get('defaults', {}))
+        shorthands.update(kwrgs.get('shorthands', {}))
+        docs.update(kwrgs.get('docs', {}))
+        defaults.update(kwrgs.get('defaults', {}))
 
         self.args = []
-        self.flags = self._find_flags()
-
-        # checking the Command settings for validity
-        # raises error if there is an invalid setting
-        check_names = kwrgs.get('check_names', True)
-        if check_names:
-            self._check_flag_settings()
+        self.flags = FlagSet(
+            names=self.flagnames,
+            defaults=defaults,
+            docs=docs,
+            shorthands=shorthands.copy(),
+            types=self.callback.__annotations__,
+            hidden=hidden,
+        )
 
     def __call__(self, argv=sys.argv):
         if argv is sys.argv:
@@ -135,15 +133,6 @@ class Command:
     def __str__(self):
         return self.helptext()
 
-    def _flag_lengths(self, flags=[]):
-        return max([len(f.name) for f in flags or self.visible_flags()]) + 3
-
-    @property
-    def _flag_help(self):
-        flags = list(self.visible_flags())
-        flen = self._flag_lengths(flags)
-        return '\n'.join(['    {1:<{0}}'.format(flen, f) for f in flags])
-
     def help(self):
         print(self.helptext())
 
@@ -151,9 +140,8 @@ class Command:
         if self.doc_help:
             return self.callback.__doc__
 
-        flags = list(self.visible_flags())
-
-        fmt_len = max([len(f.name) for f in flags]) + 3
+        flags = list(self.flags.visible_flags())
+        fmt_len = self.flags.format_len
         for f in flags:
             f.f_len = fmt_len
 
@@ -163,53 +151,6 @@ class Command:
             'name': self.name,
             'flags': flags,
         })
-
-    def _find_flags(self):
-        flags = {}
-        for name in self.flagnames:
-            opt = Option(
-                name,
-                self._meta.annotations.get(name),
-                shorthand=self.shorthands.get(name),
-                help=self.docs.get(name),
-                value=self.defaults.get(name),
-                hidden=name in self.hidden,
-                has_default=name in self.defaults
-            )
-            flags[name] = opt
-            if opt.shorthand:
-                flags[opt.shorthand] = opt
-        return flags
-
-    def _check_flag_settings(self):
-        flagchecks = set()
-        if self.defaults:
-            flagchecks.update(self.defaults.keys())
-        if self.shorthands:
-            flagchecks.update(self.shorthands.keys())
-        if self.docs:
-            flagchecks.update(self.docs.keys())
-        # check all the flags being modified by the command settings
-        for f in flagchecks:
-            if f not in self.flagnames:
-                raise DeveloperException(f'{f} is not a flag')
-
-    def _named_flags(self) -> dict:
-        return {key: val for key, val in self.iter_named_flags()}
-
-    def iter_named_flags(self):
-        for name, flag in self.flags.items():
-            if len(name) == 1 and flag.name in self.flags:
-                continue
-            yield name, flag
-
-    def visible_flags(self):
-        helpflag = Option('help', bool, shorthand='h', help='Get help.')
-        for name, flag in self.flags.items():
-            if (len(name) == 1 and flag.shorthand) or flag.hidden:
-                continue
-            yield flag
-        yield helpflag
 
     def parse_args(self, args: list) -> dict:
         '''
@@ -248,7 +189,7 @@ class Command:
                 flag.value = True if flag.value is None else not flag.value
 
         if self.allow_null:
-            return {n: f.value for n, f in self.iter_named_flags()}
+            return {n: f.value for n, f in self.flags.items()}
         return self._null_check_flag_args()
 
     def run(self, argv=sys.argv):
@@ -256,7 +197,7 @@ class Command:
 
     def _null_check_flag_args(self) -> dict:
         values = {}
-        for name, flag in self.iter_named_flags():
+        for name, flag in self.flags.items():
             # all flags should have a value at this point
             # if not, booleans are false all else raises an error
             if not flag.has_default and flag.value is None:
