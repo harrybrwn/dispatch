@@ -12,13 +12,14 @@ class Option:
                  shorthand=None, help=None, value=None,
                  hidden=False, has_default=False):
         self.name = name
-        self.type = typ or bool
+        self.type = typ if typ is not None else bool
 
         self.shorthand = shorthand
         self.help = help or ''
         self.value = value  # will infer and set the type
 
         self.hidden = hidden
+        self._default = value
         self.has_default = has_default or value is not None
         self.f_len = len(self.name)  # temp value, should be set later
 
@@ -56,15 +57,6 @@ class Option:
             return '-{}, --{}'.format(self.shorthand, self.name)
         else:
             return '     --{}'.format(self.name)
-
-    def __len__(self):
-        '''Get the length of the option name when formatted in the help text
-        eg. same as `len('-v, --verbose') or `len('    --verbose')``
-        '''
-        length = len(self.name) + 2  # plus len of '--'
-        if self.shorthand:
-            length += 4  # length of '-v, ' if v is the shorthand
-        return length
 
     @property
     def value(self):
@@ -159,7 +151,7 @@ class FlagSet:
             opt = Option(
                 name, types.get(name, bool),
                 shorthand=shorthands.get(name),
-                help=docs.get(name),
+                help=docs.get(name, ''),
                 value=defaults.get(name),
                 hidden=name in hidden,
             )
@@ -222,7 +214,7 @@ class FlagSet:
         for flag in self._flags.values():
             yield flag
 
-    def update(self, fset):
+    def update(self, fset=None):
         if not isinstance(fset, FlagSet):
             raise TypeError(
                 'must update {0} with a {0}'.format(self.__class__.__name__))

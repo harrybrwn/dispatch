@@ -98,18 +98,18 @@ class Command:
 
         self.args = []
         self.flags = FlagSet(
-            names=self.flagnames,
+            names=self._meta.params(),
             defaults=defaults,
             docs=docs,
             shorthands=shorthands.copy(),
-            types=self.callback.__annotations__,
+            types=self._meta.annotations,
             hidden=hidden,
         )
 
     def __call__(self, argv=sys.argv):
         if argv is sys.argv:
             argv = argv[1:]
-        if '--help' in argv or '-h' in argv:
+        if '--help' in argv or 'help' in argv or '-h' in argv:
             return self.help()
 
         fn_args = self.parse_args(argv)
@@ -146,6 +146,7 @@ class Command:
         The return values is supposd to be unpacked and used as an argument
         to the Command's callback function.
         '''
+        self.args = []
         args = args[:]
         while args:
             arg = args.pop(0)
@@ -158,23 +159,29 @@ class Command:
             val = None
             if '=' in arg:
                 arg, val = arg.split('=')
-            elif args and args[0][0] != '-':
-                # if the next arg is not a flag then it is the flag val
-                val = args.pop(0)
 
             flag = self.flags.get(arg)
+
             if not flag:
                 raise UserException("could not find flag '{}'".format(arg))
 
-            if val is not None:
-                # If the flag has been given a value but
-                # has no type (aka. NoneType) then we should
-                # assume it is a string.
-                if flag.type is None.__class__:
-                    flag.type = str
+            if flag.type is not bool:
+                if not val:
+                    if args and args[0][0] != '-':
+                        # if the next arg is not a flag then it is the flag val
+                        # but only if it is not for a boolean flag
+                        val = args.pop(0)
+                    else:
+                        raise UserException(
+                            f'no value given for --{flag.name}')
                 flag.setval(val)
-            elif flag.type is bool:
-                flag.value = True if flag.value is None else not flag.value
+            else:
+                if val:
+                    raise UserException('cannot give boolean flag a value')
+                elif flag.has_default:
+                    flag.value = not flag._default
+                else:
+                    flag.value = True if flag.value is None else flag.value
 
         if self.allow_null:
             return {n: f.value for n, f in self.flags.items()}

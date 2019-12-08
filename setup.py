@@ -8,7 +8,7 @@ name = 'dispatch'
 url = f'https://github.com/harrybrwn/{name}'
 
 setup(
-   name=name,
+   name=f'py-{name}',
    version=version,
    author='Harrison Brown',
    author_email='harrybrown98@gmail.com',
@@ -23,7 +23,8 @@ setup(
    install_requires=['jinja2'],
    classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: Apache License 2.0",
+        "Programming Language :: Python :: 3.7",
+        "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],
 )

@@ -1,14 +1,23 @@
 #!/usr/bin/python
 
+# flake8: noqa: E402
+
+import sys
+from os import path
+
+sys.path.insert(0, path.join(sys.path[0], '..'))
+
 import unittest
-from dispatch import dispatch
+from dispatch.dispatch import Command, command, _parse_flags_doc
 from dispatch.flags import _from_typing_module, _is_iterable, Option
 from dispatch._funcmeta import _FunctionMeta
+from dispatch.exceptions import UserException
 
 from typing import List, Set, Dict, Sequence, Mapping
 
 
-@dispatch.command(hidden={'debug'})
+
+@command(hidden={'debug'})
 def some_cli(file: str, verbose: bool, time: str = 'local',
              debug: bool = False, output: str = 'stdout'):
     '''Some_cli is just some generic cli tool
@@ -34,7 +43,7 @@ class TestCommand(unittest.TestCase):
 
     def testCommand(self):
         def fn(arg1, arg2): pass
-        cmd = dispatch.Command(fn)
+        cmd = Command(fn)
         self.assertEqual(cmd.name, 'fn')
         self.assertEqual(cmd.flags['arg1'].name, 'arg1')
         self.assertEqual(cmd.flags['arg2'].name, 'arg2')
@@ -43,17 +52,17 @@ class TestCommand(unittest.TestCase):
 
     def testEmptyCommand(self):
         def fn(): pass
-        cmd = dispatch.Command(fn)
+        cmd = Command(fn)
         self.assertEqual(len(cmd.flags), 0)
         self.assertEqual(cmd.name, 'fn')
 
-        @dispatch.command
+        @command
         def run(): pass
         run()
 
     def testOptionTypes(self):
         def fn(a: str, b: int, c: bool, d: self.FlagType, pi=3.14159): pass
-        cmd = dispatch.Command(fn)
+        cmd = Command(fn)
         flags = cmd.flags
         self.assertEqual(len(cmd.flags), 5)
         self.assertEqual(flags['a'].type, str)
@@ -75,14 +84,14 @@ class TestCommand(unittest.TestCase):
             :      t              tag :this is a tag
 
             '''
-        parsed = dispatch._parse_flags_doc(fn.__doc__)
+        parsed = _parse_flags_doc(fn.__doc__)
         self.assertTrue('verbose' in parsed)
         self.assertEqual(parsed['verbose']['shorthand'], 'v')
         self.assertTrue('pi' in parsed)
         self.assertTrue(parsed['pi']['shorthand'] is None)
         self.assertEqual(parsed['tag']['doc'], "this is a tag")
 
-        cmd = dispatch.Command(fn)
+        cmd = Command(fn)
         self.assertEqual(
             cmd._help, "fn is a function\nthat has a multi-line description.")
         self.assertEqual(len(cmd.flags), 3)
@@ -122,26 +131,26 @@ class TestCommand(unittest.TestCase):
         def fn(verbose: bool, hello):
             ''':l hello: say hello'''
             pass
-        cmd = dispatch.Command(fn)
+        cmd = Command(fn)
         self.assertTrue(cmd.flags['l'] is not None)
         self.assertEqual(cmd.flags['l'].name, 'hello')
         self.assertIn('-l, --hello', cmd.helptext())
 
-        @dispatch.command
+        @command
         def fn2(verbose: bool, hello):
             ''':l hello: say hello'''
         self.assertIn('-l, --hello', fn2.helptext())
 
     def testBadDoc(self):
         def f1(verbose: bool): pass
-        cmd = dispatch.Command(f1)
+        cmd = Command(f1)
         htext = cmd.helptext()
         expected = 'Usage:\n    f1 [options]\n\nOptions:\n        --verbose   \n    -h, --help      Get help.' # noqa
         self.assertTrue(htext and len(htext) > 5)
         self.assertEqual(expected, cmd.helptext())
 
         def f2(): pass
-        cmd = dispatch.Command(f2)
+        cmd = Command(f2)
         htext = cmd.helptext()
         self.assertTrue(htext and len(htext) > 5)
         self.assertEqual(self.EMPTY_HELP.format(name='f2'), htext)
@@ -152,13 +161,13 @@ class TestCommand(unittest.TestCase):
             :n name: give the program a name
             '''
             self.assertEqual(name, 'joe')
-        cmd = dispatch.Command(fn)
+        cmd = Command(fn)
         cmd.run(['--name', 'joe'])
         cmd.run(['-n', 'joe'])
         cmd.run(['--name=joe'])
         cmd.run(['-n=joe'])
 
-        @dispatch.command
+        @command
         def fn2(name: str):
             '''
             :n name: give the program a name
@@ -174,14 +183,14 @@ class TestCommand(unittest.TestCase):
         r = fn2(['-n=joe'])
         self.assertTrue(r == 1)
 
-        @dispatch.command()
+        @command()
         def fn3(multi_word_flag, bool_flag: bool):
             self.assertTrue(multi_word_flag)
             self.assertFalse(bool_flag)
         fn3(['--multi-word-flag'])  # pylint: disable=no-value-for-parameter
 
     def testCommandSettings(self):
-        @dispatch.command(
+        @command(
             hidden={'debug', 'verbose'},
             defaults={'debug': False})
         def f1(debug: bool, verbose: bool):
@@ -196,8 +205,8 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(val, 76)
         self.assertEqual(str(f1), f1.helptext())
 
-        @dispatch.command(shorthands={'debug': 'd'},
-                          help="f2 is a test command")
+        @command(shorthands={'debug': 'd'},
+                 help="f2 is a test command")
         def f2(debug: bool = False):
             self.assertTrue(debug)
             return 'what???'
@@ -206,7 +215,7 @@ class TestCommand(unittest.TestCase):
         self.assertIn('f2 is a test command', f2.helptext())
         self.assertEqual(str(f2), f2.helptext())
 
-        @dispatch.command(doc_help=True, allow_null=True)
+        @command(doc_help=True, allow_null=True)
         def f3(some_string: str):
             '''this is the raw documentation
 -h, --help'''
@@ -261,6 +270,29 @@ that has a multi-line description.'''
         self.assertIn('Give the program an output file (default: stdout)', got)
         self.assertIn('-h, --help', got)
 
+    def testArgParsing(self):
+        @command
+        def cli(file: str, verbose: bool, time: str = 'local',
+                debug: bool = False, output: str = 'stdout'):
+            self.assertTrue(isinstance(debug, bool))
+            self.assertTrue(debug)
+            self.assertTrue(len(cli.args) > 0)
+            self.assertEqual(cli.args[0], 'argument')
+
+        cli(['--debug', 'argument'])  # pylint: disable=no-value-for-parameter
+        self.assertEqual(len(cli.args), 1)
+        cli(['argument', '--debug'])  # pylint: disable=no-value-for-parameter
+        self.assertEqual(len(cli.args), 1)
+        cli(['--debug', 'argument'])  # pylint: disable=no-value-for-parameter
+        self.assertEqual(len(cli.args), 1)
+        cli(['argument', '-debug',  # pylint: disable=no-value-for-parameter
+             'a value', '-verbose',
+             'another-value', '--time', 'now'])
+        self.assertEqual(cli.args, ['argument', 'a value', 'another-value'])
+        self.assertRaises(UserException,
+            cli, ['argument', '-debug', '--time']
+        )
+
 
 class TestOptions(unittest.TestCase):
 
@@ -304,11 +336,15 @@ class TestOptions(unittest.TestCase):
             ValueError, o.setval,
             '{one:1.0,two:2.5,three:the third number,four:4}')
 
-        @dispatch.command()
+        @command()
         def f(keys: Dict[str, float]):
             pass
         self.assertRaises(
             ValueError, f, ['--keys', '{one:1,two:this is the number two}'])
+
+
+class TestFlagSet(unittest.TestCase):
+    def testInit(self): pass
 
 
 class TestHelpers(unittest.TestCase):
