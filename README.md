@@ -8,18 +8,20 @@ Inspired by [fire](https://github.com/google/python-fire) and [click](https://cl
 ```python
 # example.py
 import dispatch
+import sys
 
-@dispatch.command(hidden={'debug'})
-def hello(name: str, verbose: bool, debug: bool):
+@dispatch.command
+def hello(name: str, verbose: bool, debug: bool, file: str = 'stdout'):
     '''Run the 'hello' command line interface.
 
     :v verbose: Run the command verbosly
     :name: Name of the person you are saying hello to.
+    :file: Either stdout or stderr
     '''
     if debug:
-        print(f'debugging with {name}')
+        print(f'debugging with {name}', file=getattr(sys, file))
     else:
-        print(f'hello, {name}')
+        print(f'hello, {name}', file=getattr(sys, file))
 
 if __name__ == '__main__':
     hello()
@@ -39,6 +41,8 @@ Usage:
 Options:
         --name      Name of the person you are saying hello to.
     -v, --verbose   Run the command verbosly
+        --debug     
+        --file      Either stdout or stderr (default: stdout)
     -h, --help      Get help.
 ```
 

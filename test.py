@@ -2,7 +2,8 @@
 
 import unittest
 from dispatch import dispatch
-from dispatch.flags import _from_typing_module, _is_iterable
+from dispatch.flags import _from_typing_module, _is_iterable, Option
+from dispatch._funcmeta import _FunctionMeta
 
 from typing import List, Set, Dict, Sequence, Mapping
 
@@ -105,6 +106,18 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(cmd.flags['t'], cmd.flags['tag'])
         self.assertEqual(id(cmd.flags['t']), id(cmd.flags['tag']))
 
+        self.assertTrue(cmd.flags['verbose'].has_default)
+        self.assertEqual(cmd.flags['verbose'].value, False)
+        self.assertTrue(cmd.flags['pi'].has_default)
+        self.assertEqual(cmd.flags['pi'].value, 3.14159)
+        self.assertTrue(cmd.flags['tag'].has_default)
+        self.assertEqual(cmd.flags['tag'].value, '')
+
+        hlp = cmd.helptext()
+        for name, flag in cmd.flags.items():
+            self.assertIn(name, hlp)
+            self.assertIn(flag.help, hlp)
+
     def testIncompleteDocParsing(self):
         def fn(verbose: bool, hello):
             ''':l hello: say hello'''
@@ -146,26 +159,26 @@ class TestCommand(unittest.TestCase):
         cmd.run(['-n=joe'])
 
         @dispatch.command
-        def fn(name: str):
+        def fn2(name: str):
             '''
             :n name: give the program a name
             '''
             self.assertEqual(name, 'joe')
-            return len(fn.flags)
-        r = fn(['--name', 'joe'])
+            return len(fn2.flags)
+        r = fn2(['--name', 'joe'])
         self.assertTrue(r == 1)
-        r = fn(['-n', 'joe'])
+        r = fn2(['-n', 'joe'])
         self.assertTrue(r == 1)
-        r = fn(['--name=joe'])
+        r = fn2(['--name=joe'])
         self.assertTrue(r == 1)
-        r = fn(['-n=joe'])
+        r = fn2(['-n=joe'])
         self.assertTrue(r == 1)
 
         @dispatch.command()
-        def fn(multi_word_flag, bool_flag: bool):
+        def fn3(multi_word_flag, bool_flag: bool):
             self.assertTrue(multi_word_flag)
             self.assertFalse(bool_flag)
-        fn(['--multi-word-flag'])
+        fn3(['--multi-word-flag'])  # pylint: disable=no-value-for-parameter
 
     def testCommandSettings(self):
         @dispatch.command(
@@ -178,10 +191,8 @@ class TestCommand(unittest.TestCase):
             self.assertEqual(exp, got)
             self.assertTrue(verbose)
             self.assertFalse(debug)
-            # self.assertTrue(len(f1.hidden) == 2)
-            # self.assertTrue(len(f1.defaults) == 1)
             return 76
-        val = f1(['-v'])
+        val = f1(['-v'])  # pylint: disable=no-value-for-parameter
         self.assertEqual(val, 76)
         self.assertEqual(str(f1), f1.helptext())
 
@@ -202,7 +213,7 @@ class TestCommand(unittest.TestCase):
             self.assertTrue(some_string is None)
         self.assertEqual(
             f3.helptext(), 'this is the raw documentation\n-h, --help')
-        f3()
+        f3()  # pylint: disable=no-value-for-parameter
 
     def testFormat(self):
         pass
@@ -229,16 +240,32 @@ class TestCommand(unittest.TestCase):
         sc = SomeClass()
         funcs = [sc.cmd, sc.class_cmd, sc.static_cmd, SomeClass.static_cmd]
         for f in funcs:
-            m = dispatch.dispatch._FunctionMeta(f)
+            m = _FunctionMeta(f)
             self.assertEqual(m.params()[0], 'hello')
             self.assertEqual(m.name, f.__name__)
             self.assertEqual(m.doc, f.__doc__)
+
+    def testHelp(self):
+        got = some_cli.helptext()
+        h = '''Some_cli is just some generic cli tool
+that has a multi-line description.'''
+        self.assertIn(h, got)
+        self.assertTrue(got.startswith(h))
+        self.assertIn('-f, --file', got)
+        self.assertIn('Give the cli a file', got)
+        self.assertIn('-v, --verbose', got)
+        self.assertIn('Print out all the information to stdout', got)
+        self.assertIn('--time', got)
+        self.assertIn('Use some other time (default: local)', got)
+        self.assertIn('-o, --output', got)
+        self.assertIn('Give the program an output file (default: stdout)', got)
+        self.assertIn('-h, --help', got)
 
 
 class TestOptions(unittest.TestCase):
 
     def testTypeParsing(self):
-        o = dispatch.Option('o', List[int])
+        o = Option('o', List[int])
         o.setval('[1,2,3,4]')
         self.assertTrue(isinstance(o.value, list))
         for got, want in zip(o.value, [1, 2, 3, 4]):
@@ -246,7 +273,7 @@ class TestOptions(unittest.TestCase):
             self.assertTrue(isinstance(want, int))
             self.assertEqual(got, want)
 
-        o = dispatch.Option('o', list)
+        o = Option('o', list)
         o.setval('[1,2,3,4]')
         self.assertTrue(isinstance(o.value, list))
         for got, want in zip(o.value, [1, 2, 3, 4]):
@@ -255,7 +282,7 @@ class TestOptions(unittest.TestCase):
             self.assertEqual(int(got), want)
             self.assertEqual(got, str(want))
 
-        o = dispatch.Option('o', Set[float])
+        o = Option('o', Set[float])
         o.setval('[1.5,2.6,3.7,4.8]')
         self.assertTrue(isinstance(o.value, set))
         for got, want in zip(o.value, [1.5, 2.6, 3.7, 4.8]):
@@ -264,7 +291,7 @@ class TestOptions(unittest.TestCase):
             self.assertEqual(got, want)
             self.assertEqual(got, want)
 
-        o = dispatch.Option('o', Dict[str, int])
+        o = Option('o', Dict[str, int])
         o.setval('{one:1,two:2,three:3}')
         self.assertTrue(isinstance(o.value, dict))
         for k, v in o.value.items():
@@ -272,7 +299,7 @@ class TestOptions(unittest.TestCase):
             self.assertTrue(isinstance(v, int))
 
     def testBadTypeParsing(self):
-        o = dispatch.Option('outout', Dict[str, float])
+        o = Option('outout', Dict[str, float])
         self.assertRaises(
             ValueError, o.setval,
             '{one:1.0,two:2.5,three:the third number,four:4}')
@@ -282,26 +309,6 @@ class TestOptions(unittest.TestCase):
             pass
         self.assertRaises(
             ValueError, f, ['--keys', '{one:1,two:this is the number two}'])
-
-    def testOptionFormatting(self):
-        opts = [
-            dispatch.Option(
-                'out', bool, shorthand='o', help='Give the output'),
-            dispatch.Option(
-                'verbose', bool, shorthand='v', help='the verbosity'),
-            dispatch.Option(
-                'name', str, help='the name'),
-        ]
-        l = max([len(o.name)+2 for o in opts]) # noqa
-
-    # def testFormat(self):
-    #     o = dispatch.Option(
-    #             'out', bool, shorthand='o', help='Give the output')
-    #     print()
-    #     print('{:<10}'.format(o))
-    #     print('--{name}{help:>15}'.format(
-    #         name='out', help='hello are you there'))
-    #     print('hell{x:>6}'.format(x='hello'))
 
 
 class TestHelpers(unittest.TestCase):

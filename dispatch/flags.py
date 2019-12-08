@@ -19,7 +19,7 @@ class Option:
         self.value = value  # will infer and set the type
 
         self.hidden = hidden
-        self.has_default = has_default
+        self.has_default = has_default or value is not None
         self.f_len = len(self.name)  # temp value, should be set later
 
         if self.shorthand == 'h' and self.name != 'help':

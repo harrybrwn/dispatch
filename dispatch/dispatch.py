@@ -30,7 +30,7 @@ Usage:
 Options:
 {%- for flg in flags %}
     {{ '{}'.format(flg) }}
-    {%- if flg.has_default %}{{ flg.show_default() }}{% endif %}
+    {%- if flg.has_default %} {{ flg.show_default() }}{% endif %}
 {%- endfor %}
 '''
 
