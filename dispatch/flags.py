@@ -8,6 +8,10 @@ from ._meta import _FunctionMeta
 
 
 class Option:
+
+    __slots__ = ('name', 'type', 'shorthand', 'help', '_value',
+                 'hidden', '_default', 'has_default', 'f_len')
+
     def __init__(self, name, typ, *,
                  shorthand=None, help=None, value=None,
                  hidden=False, has_default=False):
@@ -17,6 +21,7 @@ class Option:
         self.shorthand = shorthand
         self.help = help or ''
         self.value = value  # will infer and set the type
+        self._value
 
         self.hidden = hidden
         self._default = value
@@ -123,6 +128,8 @@ class FlagSet:
     DEFAULT_HELP_FLAG = Option('help', bool, shorthand='h', help='Get help.')
     MIN_FMT_LEN = 3
 
+    __slots__ = ('_flags', '_flagnames', '_shorthands')
+
     def __init__(self, *, obj=None, names: list = None, defaults: dict = {},
                  docs: dict = {}, shorthands: dict = {}, types: dict = {},
                  hidden: set = {}):
@@ -143,7 +150,7 @@ class FlagSet:
                 text of the FlagSet.
         '''
         self._flags = {}
-        self._flagnames = names or []
+        self._flagnames = names or ()
         self._shorthands = {}
 
         for name in self._flagnames:

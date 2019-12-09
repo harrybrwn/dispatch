@@ -7,15 +7,23 @@ class _FunctionMeta:
     '''Not a metaclass, the 'meta' means 'meta-data'.'''
     def __init__(self, obj, name=None, doc=None,
                  code=None, defaults=None, annotations=None):
-        self.obj = obj
+        if isinstance(obj, (classmethod, staticmethod)):
+            self.obj = obj.__func__
+        else:
+            self.obj = obj
+
         self.run = obj.__call__
         self.name = name or obj.__name__
         self.doc = doc or obj.__doc__
         self.code = code or obj.__code__
         self._defaults = defaults or obj.__defaults__
         self.annotations = annotations or obj.__annotations__
-        self._params_start = 0
         self.signature = inspect.signature(self.obj)
+
+        if isinstance(self.obj, types.MethodType):
+            self._params_start = 1  # exclude 'self' or 'cls'
+        else:
+            self._params_start = 0
 
     def _type_checking(self, obj):
         '''

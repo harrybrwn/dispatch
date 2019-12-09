@@ -10,7 +10,7 @@ pip install py-dispatch
 ```
 
 ## Demo
-[docs.python]: # (grep -Pzo "(?s)# example\.py.*\n(?=#end example\.py)" example.py)
+[docs.python]: # (grep -Pzo "[[?s]]# example\.py.*[[?=#end example\.py]]" example.py | tr -d '\0')
 ```python
 # example.py
 import dispatch

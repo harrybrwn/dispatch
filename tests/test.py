@@ -14,6 +14,7 @@ from dispatch._meta import _FunctionMeta
 from dispatch.exceptions import UserException
 
 from typing import List, Set, Dict, Sequence, Mapping
+import types
 
 
 
@@ -29,6 +30,23 @@ def some_cli(file: str, verbose: bool, time: str = 'local',
     :o output:  Give the program an output file
     '''
     pass
+
+
+class SomeClass:
+    def cmd(self, hello: str, switch: bool, what='hello'):
+        ''':hello: say hello'''
+        print('method command')
+        print(self)
+
+    @classmethod
+    def class_cmd(cls, hello: str, switch: bool, what='hello'):
+        ''':hello: say hello'''
+        print('classmethod command')
+
+    @staticmethod
+    def static_cmd(hello: str, switch: bool, what='hello'):
+        ''':hello: say hello'''
+        print('staticmethod command')
 
 
 class TestCommand(unittest.TestCase):
@@ -227,25 +245,8 @@ class TestCommand(unittest.TestCase):
     def testFormat(self):
         pass
 
-    class SomeClass:
-        def cmd(self, hello):
-            ''':hello: say hello'''
-            print('method command')
-            print(self)
-
-        @classmethod
-        def class_cmd(cls, hello):
-            ''':hello: say hello'''
-            print('classmethod command')
-
-        @staticmethod
-        def static_cmd(hello):
-            ''':hello: say hello'''
-            print('staticmethod command')
-
     def testMeta(self):
         self.skipTest('this feature isnt finished')
-        SomeClass = TestCommand.SomeClass
         sc = SomeClass()
         funcs = [sc.cmd, sc.class_cmd, sc.static_cmd, SomeClass.static_cmd]
         for f in funcs:
@@ -395,7 +396,7 @@ class TestHelpers(unittest.TestCase):
         self.assertFalse(_from_typing_module(A))
 
 
-class TestMetaProgramming(unittest.TestCase):
+class TestMeta(unittest.TestCase):
     def testFunctionMeta(self):
         import inspect
 
@@ -419,10 +420,30 @@ class TestMetaProgramming(unittest.TestCase):
         self.assertTrue(m.has_variadic_param())
         f(*posargs, **kwds)
 
+    def testClassFuncs(self):
+        print()
+        c = SomeClass()
+        m = _FunctionMeta(c.cmd)
+        self.assertTrue(isinstance(m.obj, types.MethodType))
+        m = _FunctionMeta(c.class_cmd)
+        self.assertTrue(isinstance(m.obj, types.MethodType))
+        m = _FunctionMeta(c.static_cmd)
+        self.assertFalse(isinstance(m.obj, types.MethodType))
+        print(sys.getrefcount(SomeClass))
+
 
 if __name__ == '__main__':
-    unittest.main()
+    # unittest.main()
+    import gc
+    print(gc.get_count())
+    # n = sys.getrefcount(SomeClass)
+    # print(sys.getrefcount(SomeClass))
+    refs = gc.get_referrers(SomeClass)
+    # del SomeClass
+    print(gc.get_count())
 
+
+def bench():
     from timeit import timeit
     from string import ascii_letters
     setup = 'from string import ascii_letters; args = list(ascii_letters)'
