@@ -10,7 +10,7 @@ pip install py-dispatch
 ```
 
 ## Demo
-[docs.python]: # (cat example.py)
+[docs.python]: # (grep -vP (flake8|pylint) example.py)
 ```python
 # example.py
 import dispatch
@@ -47,7 +47,7 @@ Usage:
 Options:
         --name      Name of the person you are saying hello to.
     -v, --verbose   Run the command verbosly
-        --debug
+        --debug     
         --file      Either stdout or stderr (default: stdout)
     -h, --help      Get help.
 ```

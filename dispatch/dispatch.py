@@ -16,7 +16,7 @@ import sys
 import jinja2
 
 from .flags import FlagSet
-from ._funcmeta import _FunctionMeta
+from ._meta import _FunctionMeta
 from .exceptions import UserException, DeveloperException, RequiredFlagError
 
 
@@ -25,7 +25,7 @@ HELP_TMPL = '''{%- if main_doc -%}
 
 {% endif -%}
 Usage:
-    {{ name }} [options]
+    {{ usage }}
 
 Options:
 {%- for flg in flags %}
@@ -44,6 +44,7 @@ class Command:
             callback: a function that runs the command
 
         Keyword Args:
+            usage (str): Give the command a custom usage line.
             shorthands (dict): Give the command flags a shorthand use
                 {<flag name>: <shorthand>}, has greater precedence over doc
                 parsing.
@@ -78,6 +79,7 @@ class Command:
         self.name = self._meta.name
         self.flagnames = self._meta.params()
         self._help, flagdoc = parse_doc(self._meta.doc)
+        self._usage = kwrgs.get('usage', f'{self.name} [options]')
 
         defaults = self._meta.defaults()
         shorthands = {}
@@ -136,7 +138,7 @@ class Command:
         tmpl = jinja2.Template(self.help_template)
         return tmpl.render({
             'main_doc': self._help,
-            'name': self.name,
+            'usage': self._usage,
             'flags': flags,
         })
 

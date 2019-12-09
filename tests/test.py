@@ -296,6 +296,10 @@ that has a multi-line description.'''
 
 class TestOptions(unittest.TestCase):
 
+    class AType:
+        def __init__(self, val):
+            self.val = val
+
     def testTypeParsing(self):
         o = Option('o', List[int])
         o.setval('[1,2,3,4]')
@@ -330,11 +334,27 @@ class TestOptions(unittest.TestCase):
             self.assertTrue(isinstance(k, str))
             self.assertTrue(isinstance(v, int))
 
+        opt = Option('num', complex)
+        opt.setval('5+9j')
+        self.assertEqual(opt.value, complex(5, 9))
+        opt.setval(complex(7, 2))
+        self.assertEqual(opt.value, complex(7, 2))
+        opt.setval(6.7)
+        self.assertEqual(opt.value, complex(6.7, 0))
+
+        opt = Option('type', self.AType)
+        opt.setval('hello')
+        self.assertTrue(isinstance(opt.value, self.AType))
+        self.assertEqual(opt.value.val, 'hello')
+
     def testBadTypeParsing(self):
         o = Option('outout', Dict[str, float])
         self.assertRaises(
             ValueError, o.setval,
             '{one:1.0,two:2.5,three:the third number,four:4}')
+
+        opt = Option('num', complex)
+        self.assertRaises(ValueError, opt.setval, '4+3i')
 
         @command()
         def f(keys: Dict[str, float]):
@@ -378,3 +398,23 @@ class TestHelpers(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+    from timeit import timeit
+    from string import ascii_letters
+    setup = 'from string import ascii_letters; args = list(ascii_letters)'
+    # setup = "args = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i']"
+    print('pop(0):        ', timeit('''
+a = args[:]
+while a:
+    arg = a.pop(0)
+''', setup=setup))
+    print('pop():         ', timeit('''
+a = args[:]
+while a:
+    arg = a.pop()
+''', setup=setup))
+    print('reversed pop():', timeit('''
+a = list(reversed(args))
+while a:
+    arg = a.pop()
+''', setup=setup))

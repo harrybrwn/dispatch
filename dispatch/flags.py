@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from dataclasses import is_dataclass
 
 from .exceptions import DeveloperException
-from ._funcmeta import _FunctionMeta
+from ._meta import _FunctionMeta
 
 
 class Option:
@@ -95,14 +95,13 @@ class Option:
 
         if not isinstance(val, str) or self.type is str:
             # if val is not a string then the type has already been converted
+            # if the type is a string, we dont need to convert it
             self._value = val
         else:
-            if _is_iterable(self.type) and self.type is not str:
+            if _is_iterable(self.type):
                 val = val.strip('[]{}').split(',')
 
-            if self.type is str:
-                self._value = val
-            elif _from_typing_module(self.type):
+            if _from_typing_module(self.type):
                 if len(self.type.__args__) == 1:
                     inner = self.type.__args__[0]
                     self._value = self.type.__origin__([inner(v) for v in val])
