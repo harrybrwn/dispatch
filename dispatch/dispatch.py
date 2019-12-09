@@ -115,6 +115,9 @@ class Command:
             return self.help()
 
         fn_args = self.parse_args(argv)
+
+        if self._meta.has_variadic_param():
+            return self._meta.run(*self.args, **fn_args)
         return self._meta.run(**fn_args)
 
     def __repr__(self):
@@ -268,7 +271,8 @@ def handle(fn):
         fn()
     except UserException as e:
         print('Error:', e, file=sys.stderr)
-        exit(1)
+        return 1
+    return 0
 
 
 command.__doc__ = f'''

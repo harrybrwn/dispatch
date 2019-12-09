@@ -10,7 +10,7 @@ pip install py-dispatch
 ```
 
 ## Demo
-[docs.python]: # (grep -vP (flake8|pylint) example.py)
+[docs.python]: # (grep -Pzo "(?s)# example\.py.*\n(?=#end example\.py)" example.py)
 ```python
 # example.py
 import dispatch
@@ -47,10 +47,28 @@ Usage:
 Options:
         --name      Name of the person you are saying hello to.
     -v, --verbose   Run the command verbosly
-        --debug     
+        --debug
         --file      Either stdout or stderr (default: stdout)
     -h, --help      Get help.
 ```
+
+Arguments
+---------
+Arguments can be retrieved in two ways, either from Command.args or with positional only arguments. When a cli function is run, it is replaced with a Command object so the cli function can use the command in it's own body.
+```python
+@dispatch.command
+def cli(verbose: bool):
+    print(cli.args)
+```
+Running this cli with `python cli.py hello --verbose these are some args` will result in `['hello', 'these', 'are', 'some', 'args']`.
+
+The Other way to get arguments is to give the cli function a positional only argument at the beginning of the parameters list.
+```python
+@dispatch.command
+def cli(*args, verbose: bool):
+    print(args)
+```
+Running this cli as before will have the same result. However, it only works when the args tuple is the first function parameter.
 
 Properties of Flags
 ===================
@@ -69,3 +87,19 @@ def cli(verbose):
     else:
         print('using default of False for verbose')
 ```
+
+Flag Types
+----------
+Dispatch uses type annotations to infer flag types and will use those annotations to convert the arguments given.
+```python
+# cli.py
+@dispatch.command
+def cli(num: complex, decimal: float):
+    pass
+```
+When the program `cli.py` is executed it will convert each argument to its type.
+```bash
+python cli.py --num=5+3j --decimal=5.9
+```
+For this command, the parser internals will eventually call `complex('5+3j')` and `float('5.9')` before giving the values as function arguments.
+What this means is that you can use any type as long it has an `__init__` function that takes one argument. However there are exceptions

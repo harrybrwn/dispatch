@@ -10,7 +10,7 @@ sys.path.insert(0, path.join(sys.path[0], '..'))
 import unittest
 from dispatch.dispatch import Command, command, _parse_flags_doc
 from dispatch.flags import _from_typing_module, _is_iterable, Option
-from dispatch._funcmeta import _FunctionMeta
+from dispatch._meta import _FunctionMeta
 from dispatch.exceptions import UserException
 
 from typing import List, Set, Dict, Sequence, Mapping
@@ -385,7 +385,6 @@ class TestHelpers(unittest.TestCase):
         self.assertTrue(_is_iterable([1, 2, 3]))
 
     def testFromTypingModule(self):
-
         self.assertTrue(_from_typing_module(List))
         self.assertTrue(_from_typing_module(Sequence))
         self.assertTrue(_from_typing_module(Dict[int, str]))
@@ -394,6 +393,31 @@ class TestHelpers(unittest.TestCase):
         self.assertFalse(_from_typing_module(dict))
         class A: pass # noqa
         self.assertFalse(_from_typing_module(A))
+
+
+class TestMetaProgramming(unittest.TestCase):
+    def testFunctionMeta(self):
+        import inspect
+
+        def f(*args, name: str, verbose, file='/dev/null'):
+            var = 'hello'
+            new_const = 55
+            self.assertEqual(('one', 'two', 3, complex(4)), args)
+
+        m = _FunctionMeta(f)
+        self.assertEqual(m.run, f.__call__)
+        self.assertEqual(m.annotations, f.__annotations__)
+
+        self.assertEqual(m.params(), ('name', 'verbose', 'file'))
+        posargs = ['one', 'two', 3, complex(4)]
+        kwds = {
+            'name': 'jim',
+            'verbose': True,
+            'file': '/dev/null',
+        }
+
+        self.assertTrue(m.has_variadic_param())
+        f(*posargs, **kwds)
 
 
 if __name__ == '__main__':
