@@ -207,7 +207,7 @@ def parse_doc(docstr: str) -> tuple:
         desc = docstr[:i]
         flags = _parse_flags_doc(docstr[i:])
 
-    doc = '\n'.join([l.strip() for l in desc.split('\n') if l])
+    doc = '\n'.join([l for l in desc.split('\n')])
     return doc.strip(), flags
 
 

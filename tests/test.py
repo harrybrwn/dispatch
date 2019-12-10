@@ -1,11 +1,12 @@
-#!/usr/bin/python
+#!/usr/bin/env python
+
 
 # flake8: noqa: E402
 
 import sys
 from os import path
 
-sys.path.insert(0, path.join(sys.path[0], '..'))
+sys.path.insert(0, path.split(sys.path[0])[0])
 
 import unittest
 from dispatch.dispatch import Command, command, _parse_flags_doc
@@ -15,7 +16,6 @@ from dispatch.exceptions import UserException
 
 from typing import List, Set, Dict, Sequence, Mapping
 import types
-
 
 
 @command(hidden={'debug'})
@@ -29,7 +29,8 @@ def some_cli(file: str, verbose: bool, time: str = 'local',
     :time:      Use some other time
     :o output:  Give the program an output file
     '''
-    pass
+    assert time is not None
+    assert output is not None
 
 
 class SomeClass:
@@ -50,6 +51,9 @@ class SomeClass:
 
 
 class TestCommand(unittest.TestCase):
+
+    def test(self): ...
+
     class FlagType:
         def __init(self, name):
             self.name = name
@@ -58,6 +62,14 @@ class TestCommand(unittest.TestCase):
 
     def testGeneralCommand(self):
         self.assertTrue(some_cli is not None)
+
+    def testcommand(self):
+        CFG_FILE = '/home/user/.local/etc/config.cfg'
+        @command(hidden={'debug'})
+        def cli(*args, verbose: bool, debug=False, off=False, config: str = CFG_FILE):
+            self.assertFalse(config is None)
+            self.assertEqual(config, CFG_FILE)
+        cli([])
 
     def testCommand(self):
         def fn(arg1, arg2): pass
@@ -419,6 +431,12 @@ class TestMeta(unittest.TestCase):
 
         self.assertTrue(m.has_variadic_param())
         f(*posargs, **kwds)
+        CFG_FILE = '/home/user/.local/etc/config.cfg'
+        def cli(*args, verbose: bool, debug=False, off=False, config: str = CFG_FILE):
+            pass
+        m = _FunctionMeta(cli)
+        self.assertEqual(len(m.defaults()), 3)
+        self.assertEqual(m.defaults()['config'], CFG_FILE)
 
     def testClassFuncs(self):
         print()
@@ -429,18 +447,10 @@ class TestMeta(unittest.TestCase):
         self.assertTrue(isinstance(m.obj, types.MethodType))
         m = _FunctionMeta(c.static_cmd)
         self.assertFalse(isinstance(m.obj, types.MethodType))
-        print(sys.getrefcount(SomeClass))
 
 
 if __name__ == '__main__':
-    # unittest.main()
-    import gc
-    print(gc.get_count())
-    # n = sys.getrefcount(SomeClass)
-    # print(sys.getrefcount(SomeClass))
-    refs = gc.get_referrers(SomeClass)
-    # del SomeClass
-    print(gc.get_count())
+    unittest.main()
 
 
 def bench():

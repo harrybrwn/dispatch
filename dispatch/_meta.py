@@ -12,13 +12,15 @@ class _FunctionMeta:
         else:
             self.obj = obj
 
+        self.signature = inspect.signature(self.obj)
+        kwd_only = self.has_variadic_param()
+
         self.run = obj.__call__
         self.name = name or obj.__name__
         self.doc = doc or obj.__doc__
         self.code = code or obj.__code__
         self._defaults = defaults or obj.__defaults__
         self.annotations = annotations or obj.__annotations__
-        self.signature = inspect.signature(self.obj)
 
         if isinstance(self.obj, types.MethodType):
             self._params_start = 1  # exclude 'self' or 'cls'
@@ -56,9 +58,12 @@ class _FunctionMeta:
         return bool(params)
 
     def defaults(self) -> dict:
-        args = reversed(self.params())
-        defs = reversed(self._defaults or [])
-        return dict(zip(args, defs))
+        names = reversed(self.params())
+        vals = reversed(self._defaults or [])
+        defs = dict(zip(names, vals))
+        if self.obj.__kwdefaults__:
+            defs.update(self.obj.__kwdefaults__)
+        return defs
 
     def has_dataclass(self) -> bool:
         for typ in self.annotations.values():
