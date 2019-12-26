@@ -2,8 +2,9 @@ import sys
 import jinja2
 
 from .flags import FlagSet
-from ._meta import _FunctionMeta
+from ._meta import _FunctionMeta, _isgroup
 from .exceptions import UserException, DeveloperException, RequiredFlagError
+import inspect
 
 
 HELP_TMPL = '''{%- if main_doc -%}
@@ -47,25 +48,20 @@ class Command:
             help_template (str): template used for the help text
                 to have a value of None. This would mean that none of the
                 command's flags are required.
-            allow_null (bool):  If True (default is True), flags are allowed
+            allow_null (bool):  If True (default is True), flags are allowed to be null
         '''
         self.callback = callback
         if not callable(self.callback):
             raise DeveloperException('Command callback needs to be callable')
 
-        self._meta = _FunctionMeta(
-            self.callback,
-            name=self.callback.__name__,
-            doc=self.callback.__doc__,
-            code=self.callback.__code__,
-            defaults=self.callback.__defaults__,
-            annotations=self.callback.__annotations__
-        )
+        if _isgroup(callback):
+            ...
+        else:
+            self._meta = _FunctionMeta(self.callback)
 
-        self.name = self._meta.name
         self.flagnames = self._meta.params()
         self._help, flagdoc = parse_doc(self._meta.doc)
-        self._usage = kwrgs.get('usage', f'{self.name} [options]')
+        self._usage = kwrgs.get('usage', f'{self._meta.name} [options]')
 
         defaults = self._meta.defaults()
         shorthands = {}
@@ -154,7 +150,7 @@ class Command:
             flag = self.flags.get(arg)
 
             if not flag:
-                raise UserException("could not find flag '{}'".format(arg))
+                raise UserException(f'could not find flag {arg!r}')
 
             if flag.type is not bool:
                 if not val:
@@ -264,5 +260,5 @@ command.__doc__ = f'''
 {Command.__init__.__doc__}'''
 
 Command.__init__.__doc__ = f'''
-    Iinitialze a new Command
+    Initialze a new Command
 {Command.__init__.__doc__}'''

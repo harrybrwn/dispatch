@@ -12,34 +12,24 @@ class _FunctionMeta:
         else:
             self.obj = obj
 
-        self.signature = inspect.signature(self.obj)
-        kwd_only = self.has_variadic_param()
+        if isinstance(self.obj, (types.FunctionType, types.MethodType)):
+            self.run = obj.__call__
+            self.code = code or obj.__code__
+        else:
+            self.run = None
+            self.code = None
+            raise Exception('only funcitons are supported for now')
 
-        self.run = obj.__call__
+        self.signature = inspect.signature(self.obj)
+        # kwd_only = self.has_variadic_param()
         self.name = name or obj.__name__
         self.doc = doc or obj.__doc__
-        self.code = code or obj.__code__
-        self._defaults = defaults or obj.__defaults__
         self.annotations = annotations or obj.__annotations__
+        self._defaults = defaults or obj.__defaults__
 
         if isinstance(self.obj, types.MethodType):
             self._params_start = 1  # exclude 'self' or 'cls'
         else:
-            self._params_start = 0
-
-    def _type_checking(self, obj):
-        '''
-        This is not being used yet it is mostly expirimental but is a
-        draft for the future.
-        '''
-        if isinstance(obj, (classmethod, staticmethod)):
-            self._cmd_obj = obj.__func__
-            self._params_start = 1
-        elif isinstance(obj, types.MethodType):
-            self._cmd_obj = obj
-            self._params_start = 1
-        else:
-            self._cmd_obj = obj
             self._params_start = 0
 
     def params(self):
@@ -47,13 +37,13 @@ class _FunctionMeta:
         end = self.code.co_argcount + self.code.co_kwonlyargcount
         return v[self._params_start:end]
 
-    def has_variadic_param(self):
+    def has_variadic_param(self) -> bool:
         params = list(self.signature.parameters.values())
         if not params:
             return False
         return params[0].kind == inspect.Parameter.VAR_POSITIONAL
 
-    def has_params(self):
+    def has_params(self) -> bool:
         params = list(self.signature.parameters)
         return bool(params)
 
@@ -65,7 +55,7 @@ class _FunctionMeta:
             defs.update(self.obj.__kwdefaults__)
         return defs
 
-    def has_dataclass(self) -> bool:
+    def has_dataclass_param(self) -> bool:
         for typ in self.annotations.values():
             if is_dataclass(typ):
                 return True
@@ -76,3 +66,13 @@ class _FunctionMeta:
             if is_dataclass(typ):
                 return name, typ
         return '', None
+
+
+def _run_group(root, *, run=None, kwargs=None): ...
+
+
+def _isgroup(obj) -> bool:
+    return not isinstance(obj, (
+        classmethod, staticmethod,
+        types.FunctionType, types.MethodType
+    ))

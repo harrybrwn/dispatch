@@ -21,7 +21,6 @@ class Option:
         self.shorthand = shorthand
         self.help = help or ''
         self.value = value  # will infer and set the type
-        self._value
 
         self.hidden = hidden
         self._default = value
@@ -180,7 +179,7 @@ class FlagSet:
         return fmt_len + self.MIN_FMT_LEN
 
     @property
-    def _help(self):
+    def _help(self) -> str:
         fmt = '    {0:<{1}}'
         lngth = self.format_len
         return '\n'.join([fmt.format(f, lngth) for f in self.visible_flags()])
@@ -227,7 +226,7 @@ class FlagSet:
         self._flags.update(fset._flags)
         self._shorthands.update(fset._shorthands)
 
-    def get(self, key, default=None):
+    def get(self, key: str, default=None) -> Option:
         try:
             return self[key]
         except KeyError:

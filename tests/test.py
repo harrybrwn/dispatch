@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-
 # flake8: noqa: E402
 
 import sys
@@ -16,6 +15,10 @@ from dispatch.exceptions import UserException
 
 from typing import List, Set, Dict, Sequence, Mapping
 import types
+
+
+# @command
+# class classcmd: ...
 
 
 @command(hidden={'debug'})
@@ -66,15 +69,17 @@ class TestCommand(unittest.TestCase):
     def testcommand(self):
         CFG_FILE = '/home/user/.local/etc/config.cfg'
         @command(hidden={'debug'})
-        def cli(*args, verbose: bool, debug=False, off=False, config: str = CFG_FILE):
+        def cli(*args, verbose: bool, debug=False,
+                off=False, config: str = CFG_FILE):
             self.assertFalse(config is None)
             self.assertEqual(config, CFG_FILE)
+            self.assertEqual(len(args), 0)
         cli([])
 
     def testCommand(self):
         def fn(arg1, arg2): pass
         cmd = Command(fn)
-        self.assertEqual(cmd.name, 'fn')
+        self.assertEqual(cmd._meta.name, 'fn')
         self.assertEqual(cmd.flags['arg1'].name, 'arg1')
         self.assertEqual(cmd.flags['arg2'].name, 'arg2')
         self.assertIs(cmd.flags['arg1'].type, bool)
@@ -84,7 +89,7 @@ class TestCommand(unittest.TestCase):
         def fn(): pass
         cmd = Command(fn)
         self.assertEqual(len(cmd.flags), 0)
-        self.assertEqual(cmd.name, 'fn')
+        self.assertEqual(cmd._meta.name, 'fn')
 
         @command
         def run(): pass
@@ -122,8 +127,8 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(parsed['tag']['doc'], "this is a tag")
 
         cmd = Command(fn)
-        self.assertEqual(
-            cmd._help, "fn is a function\nthat has a multi-line description.")
+        self.assertIn("fn is a function", cmd._help)
+        self.assertIn("that has a multi-line description.", cmd._help)
         self.assertEqual(len(cmd.flags), 3)
         f = cmd.flags['verbose']
         self.assertEqual(f.name, 'verbose')
@@ -257,6 +262,16 @@ class TestCommand(unittest.TestCase):
     def testFormat(self):
         pass
 
+    def testVariadicCommand(self):
+        @command
+        def f(*args, thing: str, doit: bool):
+            self.assertGreater(len(args), 1)
+            self.assertEqual(args[0], 'one')
+            self.assertEqual(args[1], 'two')
+            if not doit:
+                raise Exception("expected do-it")
+        f(['one', 'two', '--doit'])
+
     def testMeta(self):
         self.skipTest('this feature isnt finished')
         sc = SomeClass()
@@ -266,13 +281,21 @@ class TestCommand(unittest.TestCase):
             self.assertEqual(m.params()[0], 'hello')
             self.assertEqual(m.name, f.__name__)
             self.assertEqual(m.doc, f.__doc__)
+        def cli(*args, verbose: bool, debug=False,
+                off=False, config: str = '.config'): ...
+        m = _FunctionMeta(cli)
+        self.assertEqual(m.name, 'cli')
+        self.assertTrue(m.has_variadic_param() == True)
+        self.assertTrue(m.has_params())
+
 
     def testHelp(self):
         got = some_cli.helptext()
         h = '''Some_cli is just some generic cli tool
 that has a multi-line description.'''
-        self.assertIn(h, got)
-        self.assertTrue(got.startswith(h))
+        self.assertIn('Some_cli is just some generic cli tool', got)
+        self.assertIn('that has a multi-line description.', got)
+        self.assertTrue(got.startswith('Some_cli is just some generic cli tool'))
         self.assertIn('-f, --file', got)
         self.assertIn('Give the cli a file', got)
         self.assertIn('-v, --verbose', got)

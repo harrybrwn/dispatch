@@ -3,7 +3,7 @@ from setuptools import setup
 with open('README.md', 'r') as readme:
     long = readme.read()
 
-version = '0.0.1'
+version = '0.0.2'
 name = 'dispatch'
 url = f'https://github.com/harrybrwn/{name}'
 
