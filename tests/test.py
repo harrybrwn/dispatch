@@ -10,7 +10,7 @@ sys.path.insert(0, path.split(sys.path[0])[0])
 import unittest
 from dispatch.dispatch import Command, command, _parse_flags_doc
 from dispatch.flags import _from_typing_module, _is_iterable, Option
-from dispatch._meta import _FunctionMeta
+from dispatch._meta import _FunctionMeta, _GroupMeta
 from dispatch.exceptions import UserException
 
 from typing import List, Set, Dict, Sequence, Mapping
@@ -18,7 +18,7 @@ import types
 
 
 # @command
-# class classcmd: ...
+class classcmd: ...
 
 
 @command(hidden={'debug'})
@@ -262,6 +262,14 @@ class TestCommand(unittest.TestCase):
     def testFormat(self):
         pass
 
+    def testClassMethodClis(self):
+        class CmdClass:
+            @command
+            def cmd(self, hello: str, switch: bool, what='hello'):
+                ''':hello: say hello'''
+                print('hello')
+        CmdClass.cmd()
+
     def testVariadicCommand(self):
         @command
         def f(*args, thing: str, doit: bool):
@@ -273,7 +281,7 @@ class TestCommand(unittest.TestCase):
         f(['one', 'two', '--doit'])
 
     def testMeta(self):
-        self.skipTest('this feature isnt finished')
+        # self.skipTest('this feature isnt finished')
         sc = SomeClass()
         funcs = [sc.cmd, sc.class_cmd, sc.static_cmd, SomeClass.static_cmd]
         for f in funcs:
@@ -288,6 +296,10 @@ class TestCommand(unittest.TestCase):
         self.assertTrue(m.has_variadic_param() == True)
         self.assertTrue(m.has_params())
 
+        class H:
+            @command
+            def test(self, flag: str): ...
+        self.assertTrue(isinstance(H.test, Command))
 
     def testHelp(self):
         got = some_cli.helptext()
@@ -441,7 +453,6 @@ class TestMeta(unittest.TestCase):
             self.assertEqual(('one', 'two', 3, complex(4)), args)
 
         m = _FunctionMeta(f)
-        self.assertEqual(m.run, f.__call__)
         self.assertEqual(m.annotations, f.__annotations__)
 
         self.assertEqual(m.params(), ('name', 'verbose', 'file'))
@@ -462,7 +473,6 @@ class TestMeta(unittest.TestCase):
         self.assertEqual(m.defaults()['config'], CFG_FILE)
 
     def testClassFuncs(self):
-        print()
         c = SomeClass()
         m = _FunctionMeta(c.cmd)
         self.assertTrue(isinstance(m.obj, types.MethodType))
@@ -470,6 +480,23 @@ class TestMeta(unittest.TestCase):
         self.assertTrue(isinstance(m.obj, types.MethodType))
         m = _FunctionMeta(c.static_cmd)
         self.assertFalse(isinstance(m.obj, types.MethodType))
+
+    def testGroupMeta(self):
+        self.skipTest('have not implimented command groups')
+        class cmd:
+            '''the doc-string'''
+            VAL = False
+
+            def one(self, value):
+                self.VAL = True
+
+            def two(self): ...
+
+        m = _GroupMeta(cmd, ['cmd', 'one'], Command)
+        self.assertEqual(m.name, "cmd")
+        self.assertEqual(m.doc, 'the doc-string')
+        m.run()
+        self.assertTrue(cmd.VAL)
 
 
 if __name__ == '__main__':

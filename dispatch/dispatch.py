@@ -2,7 +2,7 @@ import sys
 import jinja2
 
 from .flags import FlagSet
-from ._meta import _FunctionMeta, _isgroup
+from ._meta import _FunctionMeta, _GroupMeta, _isgroup
 from .exceptions import UserException, DeveloperException, RequiredFlagError
 import inspect
 
@@ -54,11 +54,7 @@ class Command:
         if not callable(self.callback):
             raise DeveloperException('Command callback needs to be callable')
 
-        if _isgroup(callback):
-            ...
-        else:
-            self._meta = _FunctionMeta(self.callback)
-
+        self._meta = _FunctionMeta(self.callback)
         self.flagnames = self._meta.params()
         self._help, flagdoc = parse_doc(self._meta.doc)
         self._usage = kwrgs.get('usage', f'{self._meta.name} [options]')
