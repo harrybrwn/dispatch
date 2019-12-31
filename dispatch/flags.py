@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from dataclasses import is_dataclass
 
 from .exceptions import DeveloperException
-from ._meta import _FunctionMeta
+from ._meta import _FunctionMeta, _GroupMeta, _CliMeta
 
 
 class Option:
@@ -129,13 +129,12 @@ class FlagSet:
 
     __slots__ = ('_flags', '_flagnames', '_shorthands')
 
-    def __init__(self, *, obj=None, names: list = None, defaults: dict = {},
-                 types: dict = {}, hidden: set = set(), **kwrgs):
+    def __init__(self, *, names: list = None, defaults: dict = None,
+                 docs: dict = None, types: dict = None,
+                 shorthands: dict = None, hidden: set = set(), **kwrgs):
         '''
         Create a FlagSet
 
-            obj:        create a new FlagSet from an object (usually a
-                dataclass or another FlagSet)
             names:      `list` of flag names, use only the fullnames
             defaults:   `dict` of default flag values
             docs:       `dict` of default flag help text
@@ -149,17 +148,22 @@ class FlagSet:
         '''
         self._flags = {}
         self._flagnames = names or ()
-        self._shorthands = kwrgs.get('shorthands', dict())
+        self._shorthands = shorthands or dict()
 
-        docs = kwrgs.get('docs', dict())
+        types = types or dict()
+        defaults = defaults or dict()
+        docs = docs or dict()
 
-        fn_meta = kwrgs.get('__funcmeta__')
-        if fn_meta:
-            for key, val in fn_meta.flagdocs.items():
+        cmd_meta = kwrgs.get('__command_meta__')
+        if cmd_meta:
+            if not isinstance(cmd_meta, _CliMeta):
+                raise TypeError('__command_meta__ should inherit from _meta._CliMeta')
+
+            for key, val in cmd_meta.flagdocs.items():
                 self._shorthands[key] = val.get('shorthand')
                 docs[key] = val.get('doc')
-            types.update(fn_meta.annotations)
-            defaults.update(fn_meta.defaults())
+            types.update(cmd_meta.annotations())
+            defaults.update(cmd_meta.defaults())
 
         for name in self._flagnames:
             opt = Option(
@@ -170,17 +174,6 @@ class FlagSet:
                 hidden=name in hidden,
             )
             self[name] = opt
-
-        # Now find out what the obj is and use it to update the
-        # flag data
-        if obj is None:  # this is the most likly case
-            return
-        elif isinstance(obj, _FunctionMeta):
-            pass
-        elif is_dataclass(obj):
-            pass
-        elif isinstance(obj, FlagSet):
-            self.update(obj)
 
     @property
     def format_len(self) -> int:
@@ -221,12 +214,10 @@ class FlagSet:
         return iter(self._flags)
 
     def items(self):
-        for name, flag in self._flags.items():
-            yield name, flag
+        yield from self._flags.items()
 
     def values(self):
-        for flag in self._flags.values():
-            yield flag
+        yield from self._flags.values()
 
     def update(self, fset=None):
         if not isinstance(fset, FlagSet):

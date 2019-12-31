@@ -264,11 +264,8 @@ class TestCommand(unittest.TestCase):
             f3.helptext(), 'this is the raw documentation\n-h, --help')
         f3()  # pylint: disable=no-value-for-parameter
 
-    def testFormat(self):
-        pass
-
     def testClassMethodClis(self):
-        self.skipTest('doesnt work')
+        self.skipTest('doesnt work, and may never work')
         class CmdClass:
             @command
             def cmd(self, hello: str, switch: bool, what='hello'):
@@ -458,7 +455,7 @@ class TestMeta(unittest.TestCase):
             self.assertEqual(('one', 'two', 3, complex(4)), args)
 
         m = _FunctionMeta(f)
-        self.assertEqual(m.annotations, f.__annotations__)
+        self.assertEqual(m.annotations(), f.__annotations__)
 
         self.assertEqual(m.params(), ('name', 'verbose', 'file'))
         posargs = ['one', 'two', 3, complex(4)]
@@ -486,20 +483,6 @@ class TestMeta(unittest.TestCase):
         m = _FunctionMeta(c.static_cmd)
         self.assertFalse(isinstance(m.obj, types.MethodType))
 
-    def testGroupMeta(self):
-        self.skipTest('have not implimented command groups')
-        class cmd:
-            '''the doc-string'''
-            VAL = False
-            def one(self, value): self.VAL = True
-            def two(self): ...
-
-        m = _GroupMeta(cmd, ['cmd', 'one'], Command)
-        self.assertEqual(m.name, "cmd")
-        self.assertEqual(m.doc, 'the doc-string')
-        m.run()
-        self.assertTrue(cmd.VAL)
-
 
 class TestGroup(unittest.TestCase):
     def testGroup(self):
@@ -512,10 +495,18 @@ class TestGroup(unittest.TestCase):
 
     def testGroupInit(self):
         class C:
-            a_value = False
-            def c1(self): ...
+            a_value: bool = False
+            filename: str
+
+            def c1(self): ... # print(self.filename)
             def c2(self): ...
-            def __call__(self): C.a_value = True
+            @classmethod
+            def clsmthd(cls): ...
+            @staticmethod
+            def stticmthd(): ...
+            def __call__(self):
+                C.a_value = True
+
         self.assertTrue(_isgroup(C))
         self.assertTrue(_isgroup(C()))
         self.assertFalse(_isgroup(C.c1))
@@ -533,14 +524,46 @@ class TestGroup(unittest.TestCase):
         g = Group(C())
         self.assertTrue(isinstance(g.type, type))
         self.assertTrue(isinstance(g.inst, C))
+        g(['--filename=file.txt', 'c1'])
+
+    def testGroupMetaProgramming(self):
+        class C:
+            value: bool = False
+            filename: str
+        m = _GroupMeta(C)
+        ann = m.annotations()
+        self.assertIn('value', ann)
+        self.assertIn('filename', ann)
+        self.assertEqual(ann['value'], bool)
+        self.assertEqual(ann['filename'], str)
+        self.assertEqual(m.flagnames(), {'value', 'filename'})
 
     def testArgParsing(self):
+        test = self
+        @command
         class CMD:
             '''doc strings'''
-            filename: str
-            def cmd(self, verbose: bool): ...
-            def hello(self): ...
-        g = Group(CMD)
+            filename: str = 'nan'
+            verbose: bool
+            def cmd(self, flag: bool):
+                test.assertEqual(self.filename, 'test.txt')
+                test.assertTrue(flag)
+
+            def other(self, flag: bool): ...
+
+            def hello(self, testing: str):
+                test.assertEqual(testing, 'what the heck')
+        self.assertIn('cmd', CMD.commands)
+        self.assertIn('hello', CMD.commands)
+        self.assertIn('other', CMD.commands)
+        self.assertEqual(len(CMD.commands), 3)
+        CMD(['cmd', '--filename=test.txt', '--flag'])
+        CMD(['--filename', 'test.txt', 'cmd', '--flag'])
+        CMD(['--filename=test.txt', 'cmd', '--flag'])
+        CMD.args = []
+        self.assertRaises(UserException, CMD, ['other', '--flag=value'])
+        CMD.args = []
+        CMD(['hello', '--testing=what the heck'])
 
     def testFindCommands(self):
         class cmd:

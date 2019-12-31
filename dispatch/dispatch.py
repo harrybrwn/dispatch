@@ -71,7 +71,7 @@ class Command:
         self.args = []
         self.flags = FlagSet(
             names=self._meta.params(),
-            __funcmeta__=self._meta,
+            __command_meta__=self._meta,
             **kwrgs,
         )
 
@@ -149,7 +149,7 @@ class Command:
                 flag.setval(val)
             else:
                 if val:
-                    raise UserException('cannot give boolean flag a value')
+                    raise UserException(f'cannot give {flag.name!r} flag a value')
                 elif flag.has_default:
                     flag.value = not flag._default
                 else:
@@ -200,22 +200,36 @@ class Group:
             self.type = obj.__class__
 
         self.args = []
+        self.name = self.type.__name__
         self.doc = self.inst.__doc__
         self.commands = dict(_find_commands(self.type))
+        self._meta = _GroupMeta(self.inst)
 
-    def __call__(self, *args, argv=sys.argv, **kwrgs):
+        self.flags = FlagSet(
+            names=tuple(self._meta.flagnames()),
+            __command_meta__=self._meta,
+        )
+
+    def __call__(self, argv=sys.argv, **kwrgs):
         if argv is sys.argv:
             argv = argv[1:]
-        cmd, flags = self.parse_args(argv)
+        cmd = self.parse_args(argv)
 
         if callable(self.inst):
-            self.inst(*args, **kwrgs)
+            self.inst()
+            if cmd is None:
+                return
+        elif cmd is None:
+            return self.help()
+        ret = cmd(self.args)
+        self.args = [] # reset the args
+        return ret
 
     def _get_command(self, name):
         # cannot use 'private' function or dunder methods as commands
         if name.startswith('_'):
             return None
-        fn = self.type.__dict__.get(name)
+        fn = self.commands.get(name)
 
         if fn is None:
             return None
@@ -224,22 +238,70 @@ class Group:
             return fn
         return Command(fn, __instance__=self.inst)
 
-    def parse_args(self, args: list) -> tuple:
-        args = args[:]
+    def parse_args(self, args: list):
+        # TODO: use the Flag.setval in addition to this method of saving
+        # the variable.
         nextcmd = None
-        flags = {}
         while args:
-            arg = args.pop(0)
             # Need to find either a command or a flag
             # otherwise, add an argument an move on.
-            cmd = self._get_command(arg)
-            if cmd:
-                nextcmd = cmd
+            arg = args.pop(0)
+            # we only want to find the first command it the args
+            if nextcmd is None:
+                nextcmd = self._get_command(arg)
             elif arg[0] != '-':
                 self.args.append(arg)
-                continue
-        return nextcmd, flags
+            else:
+                raw_flag = arg
+                arg = raw_flag.lstrip('-').replace('-', '_')
+                val = None
+                if '=' in arg:
+                    arg, val = arg.split('=')
 
+                flag = self.flags.get(arg)
+                if flag is None:
+                    if nextcmd is None:
+                        # if we have not found a sub-command yet then we should
+                        # throw and error for an unknown flag
+                        raise UserException(f'{flag.name!r} is not a flag')
+                    # if the flag is not in the group, then it might be
+                    # for the next command (self.args is passed the the next
+                    # command).
+                    self.args.append(raw_flag)
+                    if val is not None:
+                        self.args.append(val)
+                    continue
+
+                if flag.type is not bool:
+                    if val is None:
+                        noval = False
+                        if not args:
+                            noval = True
+                        val = args.pop(0)
+
+                        if val.startswith('-'):
+                            noval = True
+                        if noval:
+                            raise UserException(
+                                f'{flag.name!r} must be given a value.')
+                else:
+                    if val is not None:
+                        raise UserException(f'{flag.name!r} should not be given a value.')
+                    val = True
+                self._set_flag_val(arg, val)
+        return nextcmd
+
+    def _set_flag_val(self, name, val):
+        if name not in self.flags or not hasattr(self.inst, name):
+            raise UserException(f'could not find flag {name!r}')
+        flagtype = self._meta.annotations().get(name, bool)
+        setattr(self.inst, name, flagtype(val))
+
+    def help(self):
+        print(self.helptext())
+
+    def helptext(self):
+        ...
 
 def helptext(fn):
     return Command(fn).helptext()
