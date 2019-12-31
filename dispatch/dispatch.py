@@ -5,6 +5,7 @@ from .flags import FlagSet
 from ._meta import _FunctionMeta, _GroupMeta, _isgroup
 from .exceptions import UserException, DeveloperException, RequiredFlagError
 import inspect
+from types import FunctionType, MethodType
 
 
 HELP_TMPL = '''{%- if main_doc -%}
@@ -54,36 +55,24 @@ class Command:
         if not callable(self.callback):
             raise DeveloperException('Command callback needs to be callable')
 
-        self._meta = _FunctionMeta(self.callback)
+        self._meta = _FunctionMeta(
+            self.callback,
+            instance=kwrgs.get('__instance__')
+        )
         self.flagnames = self._meta.params()
-        self._help, flagdoc = parse_doc(self._meta.doc)
+        self._help = self._meta.helpstr
         self._usage = kwrgs.get('usage', f'{self._meta.name} [options]')
-
-        defaults = self._meta.defaults()
-        shorthands = {}
-        docs = {}
-        for key, val in flagdoc.items():
-            shorthands[key] = val.get('shorthand')
-            docs[key] = val.get('doc')
 
         self._help = kwrgs.get('help', self._help)
         self.help_template = kwrgs.get('help_template', HELP_TMPL)
         self.doc_help = kwrgs.get('doc_help', False)
         self.allow_null = kwrgs.get('allow_null', True)
 
-        hidden = kwrgs.get('hidden', set())
-        shorthands.update(kwrgs.get('shorthands', {}))
-        docs.update(kwrgs.get('docs', {}))
-        defaults.update(kwrgs.get('defaults', {}))
-
         self.args = []
         self.flags = FlagSet(
             names=self._meta.params(),
-            defaults=defaults,
-            docs=docs,
-            shorthands=shorthands.copy(),
-            types=self._meta.annotations,
-            hidden=hidden,
+            __funcmeta__=self._meta,
+            **kwrgs,
         )
 
     def __call__(self, argv=sys.argv):
@@ -99,7 +88,7 @@ class Command:
         return self._meta.run(**fn_args)
 
     def __repr__(self):
-        return f'{self.__class__.__name__}({self._meta.name}())'
+        return f'{self.__class__.__name__}({self._meta.name}{self._meta.signature})'
 
     def __str__(self):
         return self.helptext()
@@ -188,58 +177,85 @@ class Command:
         return values
 
 
-def parse_doc(docstr: str) -> tuple:
-    if docstr is None:
-        return '', {}
-    if docstr.count(':') < 2:
-        desc = docstr
+def _find_commands(obj):
+    for name, attr in obj.__dict__.items():
+        ok = (
+            not name.startswith('_') and
+            isinstance(attr, (
+                FunctionType,
+                MethodType
+            ))
+        )
+        if ok:
+            yield name, attr
+
+
+class Group:
+    def __init__(self, obj, *args, **kwrgs):
+        if isinstance(obj, type):
+            self.inst = obj(*args, **kwrgs)
+            self.type = obj
+        else:
+            self.inst = obj
+            self.type = obj.__class__
+
+        self.args = []
+        self.doc = self.inst.__doc__
+        self.commands = dict(_find_commands(self.type))
+
+    def __call__(self, *args, argv=sys.argv, **kwrgs):
+        if argv is sys.argv:
+            argv = argv[1:]
+        cmd, flags = self.parse_args(argv)
+
+        if callable(self.inst):
+            self.inst(*args, **kwrgs)
+
+    def _get_command(self, name):
+        # cannot use 'private' function or dunder methods as commands
+        if name.startswith('_'):
+            return None
+        fn = self.type.__dict__.get(name)
+
+        if fn is None:
+            return None
+        elif isinstance(fn, Command):
+            fn._meta.add_instance(self.inst)
+            return fn
+        return Command(fn, __instance__=self.inst)
+
+    def parse_args(self, args: list) -> tuple:
+        args = args[:]
+        nextcmd = None
         flags = {}
-    else:
-        i = docstr.index(':')
-        desc = docstr[:i]
-        flags = _parse_flags_doc(docstr[i:])
-
-    doc = '\n'.join([l for l in desc.split('\n')])
-    return doc.strip(), flags
-
-
-def _parse_flags_doc(doc: str):
-    res = {}
-    s = doc[doc.index(':'):]
-
-    for line in s.split('\n'):
-        line = line.strip()
-
-        if not line.startswith(':'):
-            continue
-
-        parsed = [l for l in line.split(':') if l]
-        names = [n for n in parsed[0].split(' ') if n]
-
-        if len(parsed) >= 2:
-            tmpdoc = parsed[1].strip()
-        else:
-            tmpdoc = ''
-
-        if len(names) == 2:
-            res[names[1]] = {'doc': tmpdoc, 'shorthand': names[0]}
-        else:
-            res[names[0]] = {'doc': tmpdoc, 'shorthand': None}
-    return res
+        while args:
+            arg = args.pop(0)
+            # Need to find either a command or a flag
+            # otherwise, add an argument an move on.
+            cmd = self._get_command(arg)
+            if cmd:
+                nextcmd = cmd
+            elif arg[0] != '-':
+                self.args.append(arg)
+                continue
+        return nextcmd, flags
 
 
 def helptext(fn):
     return Command(fn).helptext()
 
 
-def command(_fn=None, **kwrgs):
-    def cmd(fn):
-        return Command(fn, **kwrgs)
+def command(_obj=None, *args, **kwrgs):
+    def cmd(obj):
+        if _isgroup(obj):
+            return Group(obj, *args, **kwrgs)
+        return Command(obj, **kwrgs)
+
     # command is being called with parens as @command(...)
-    if _fn is None:
+    if _obj is None:
         return cmd
     # being called without parens as @command
-    return cmd(_fn)
+    return cmd(_obj)
 
 
 def handle(fn):

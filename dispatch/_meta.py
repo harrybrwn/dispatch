@@ -18,10 +18,36 @@ class _CliMeta(ABC):
     def params(self): ...
 
 
+def _parse_flags_doc(doc: str):
+    res = {}
+    s = doc[doc.index(':'):]
+
+    for line in s.split('\n'):
+        line = line.strip()
+
+        if not line.startswith(':'):
+            continue
+
+        parsed = [l for l in line.split(':') if l]
+        names = [n for n in parsed[0].split(' ') if n]
+
+        if len(parsed) >= 2:
+            tmpdoc = parsed[1].strip()
+        else:
+            tmpdoc = ''
+
+        if len(names) == 2:
+            res[names[1]] = {'doc': tmpdoc, 'shorthand': names[0]}
+        else:
+            res[names[0]] = {'doc': tmpdoc, 'shorthand': None}
+    return res
+
+
 class _FunctionMeta(_CliMeta):
     '''Not a metaclass, the 'meta' means 'meta-data'.'''
     def __init__(self, obj, name=None, doc=None,
-                 code=None, defaults=None, annotations=None):
+                 code=None, defaults=None, annotations=None,
+                 instance=None):
         if isinstance(obj, (classmethod, staticmethod)):
             self.obj = obj.__func__
         else:
@@ -31,24 +57,27 @@ class _FunctionMeta(_CliMeta):
             self.code = code or obj.__code__
         else:
             raise Exception('only funcitons are supported')
-        print(dir(obj))
-        print(obj.__class__)
-        print(obj)
-        # print(isinstance(obj, MethodType))
-        # print(isinstance(obj, FunctionType))
 
         self.signature = inspect.signature(self.obj)
         self.name = name or obj.__name__
         self.doc = doc or obj.__doc__
         self.annotations = annotations or obj.__annotations__
         self._defaults = defaults or obj.__defaults__
+        self.instance = instance
+        if self.instance:
+            self.needs_self = True
+        else:
+            self.needs_self = False
 
         if isinstance(self.obj, MethodType):
             self._params_start = 1  # exclude 'self' or 'cls'
         else:
             self._params_start = 0
+        self.helpstr, self.flagdocs = self._parse_doc(self.doc)
 
     def run(self, *args, **kwrgs):
+        if self.needs_self and self.instance is not None:
+            return self.obj.__call__(self.instance, *args, **kwrgs)
         return self.obj.__call__(*args, **kwrgs)
 
     def params(self):
@@ -85,6 +114,24 @@ class _FunctionMeta(_CliMeta):
             if is_dataclass(typ):
                 return name, typ
         return '', None
+
+    def add_instance(self, inst):
+        self.instance = inst
+        self.needs_self = True
+
+    def _parse_doc(self, docstr: str) -> tuple:
+        if docstr is None:
+            return '', {}
+        if docstr.count(':') < 2:
+            desc = docstr
+            flags = {}
+        else:
+            i = docstr.index(':')
+            desc = docstr[:i]
+            flags = _parse_flags_doc(docstr[i:])
+
+        doc = '\n'.join([l for l in desc.split('\n')])
+        return doc.strip(), flags
 
 
 class _GroupMeta(_CliMeta):
@@ -137,6 +184,12 @@ def _run_group(root, *, run=None, kwargs=None): ...
 
 def _isgroup(obj) -> bool:
     return not isinstance(obj, (
+        classmethod, staticmethod,
+        types.FunctionType, types.MethodType
+    ))
+
+def _isfunc(obj) -> bool:
+    return isinstance(obj, (
         classmethod, staticmethod,
         types.FunctionType, types.MethodType
     ))

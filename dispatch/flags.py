@@ -130,8 +130,7 @@ class FlagSet:
     __slots__ = ('_flags', '_flagnames', '_shorthands')
 
     def __init__(self, *, obj=None, names: list = None, defaults: dict = {},
-                 docs: dict = {}, shorthands: dict = {}, types: dict = {},
-                 hidden: set = {}):
+                 types: dict = {}, hidden: set = set(), **kwrgs):
         '''
         Create a FlagSet
 
@@ -150,12 +149,22 @@ class FlagSet:
         '''
         self._flags = {}
         self._flagnames = names or ()
-        self._shorthands = {}
+        self._shorthands = kwrgs.get('shorthands', dict())
+
+        docs = kwrgs.get('docs', dict())
+
+        fn_meta = kwrgs.get('__funcmeta__')
+        if fn_meta:
+            for key, val in fn_meta.flagdocs.items():
+                self._shorthands[key] = val.get('shorthand')
+                docs[key] = val.get('doc')
+            types.update(fn_meta.annotations)
+            defaults.update(fn_meta.defaults())
 
         for name in self._flagnames:
             opt = Option(
                 name, types.get(name, bool),
-                shorthand=shorthands.get(name),
+                shorthand=self._shorthands.get(name),
                 help=docs.get(name, ''),
                 value=defaults.get(name),
                 hidden=name in hidden,
