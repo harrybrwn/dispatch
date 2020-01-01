@@ -181,13 +181,13 @@ class FlagSet:
         return fmt_len + self.MIN_FMT_LEN
 
     @property
-    def _help(self) -> str:
+    def help(self) -> str:
         fmt = '    {0:<{1}}'
         lngth = self.format_len
         return '\n'.join([fmt.format(f, lngth) for f in self.visible_flags()])
 
     def __str__(self):
-        return self._help
+        return str(self._flags)
 
     def __len__(self):
         return len(self._flags)

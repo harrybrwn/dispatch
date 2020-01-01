@@ -102,7 +102,10 @@ class _FunctionMeta(_CliMeta):
         params = list(self.signature.parameters.values())
         if not params:
             return False
-        return params[0].kind == inspect.Parameter.VAR_POSITIONAL
+        for p in params:
+            if p.kind == inspect.Parameter.VAR_POSITIONAL:
+                return True
+        return False
 
     def has_params(self) -> bool:
         params = list(self.signature.parameters)
@@ -148,11 +151,9 @@ class _FunctionMeta(_CliMeta):
 
 
 class _GroupMeta(_CliMeta):
-    def __init__(self, obj, args=None, _cmdtype=None):
+    def __init__(self, obj, instance=None):
         self.obj = obj
-        # self.name = obj.__name__
         self.doc = obj.__doc__
-        self._cmdtype = _cmdtype
         self._defaults = {}
 
         if hasattr(obj, '__annotations__'):
@@ -160,8 +161,16 @@ class _GroupMeta(_CliMeta):
         else:
             self._annotations = {}
 
-        for name, attr in self.obj.__dict__.items():
-            if not name.startswith('_') and not _isfunc(attr):
+        # attrs = self.obj.__dict__
+        attrs = self.obj.__class__.__dict__
+        # print(attrs)
+
+        for name, attr in attrs.items():
+            if (
+                not name.startswith('_') and
+                not _isfunc(attr) and
+                attr != type.mro
+            ):
                 self._annotations[name] = type(attr)
                 self._defaults[name] = attr
         self.helpstr, self.flagdocs = self._parse_doc(self.doc)
@@ -177,7 +186,7 @@ class _GroupMeta(_CliMeta):
         return ()
 
     def defaults(self):
-        return {}
+        return self._defaults
 
     def annotations(self):
         return self._annotations

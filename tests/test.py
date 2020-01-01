@@ -546,13 +546,17 @@ class TestGroup(unittest.TestCase):
             filename: str = 'nan'
             verbose: bool
             def cmd(self, flag: bool):
+                '''Sub command of CMD'''
                 test.assertEqual(self.filename, 'test.txt')
                 test.assertTrue(flag)
 
-            def other(self, flag: bool): ...
+            def other(self, flag: bool):
+                '''Sub command of CMD'''
 
             def hello(self, testing: str):
+                '''Sub command of CMD'''
                 test.assertEqual(testing, 'what the heck')
+
         self.assertIn('cmd', CMD.commands)
         self.assertIn('hello', CMD.commands)
         self.assertIn('other', CMD.commands)
@@ -564,6 +568,11 @@ class TestGroup(unittest.TestCase):
         self.assertRaises(UserException, CMD, ['other', '--flag=value'])
         CMD.args = []
         CMD(['hello', '--testing=what the heck'])
+        helptxt = CMD.helptext()
+        self.assertIn('CMD', helptxt)
+        self.assertIn('Sub command of CMD', helptxt)
+        self.assertIn('--verbose', helptxt)
+        self.assertIn('--filename', helptxt)
 
     def testFindCommands(self):
         class cmd:
@@ -575,6 +584,38 @@ class TestGroup(unittest.TestCase):
             def two(self): ...
         self.assertEqual(set(dict(_find_commands(cmd)).keys()), {'one', 'two'})
         self.assertTrue(_isgroup(cmd))
+
+    def testTypes(self):
+        eq = self.assertEqual
+        istrue = self.assertTrue
+
+        class thing:
+            def __init__(self, val=0): self.val = int(val)
+
+        class cmd:
+            value: str
+            num: float
+            t: thing
+            asnull: bool = False
+
+            def __call__(self):
+                if self.asnull:
+                    eq(self.value, '')
+                    eq(self.num, 0.0)
+                    eq(self.asnull, True)
+                else:
+                    eq(self.value, 'this is a test value')
+                    eq(self.num, 3.14159)
+                    eq(self.t.val, 98)
+                istrue(isinstance(self.value, str))
+                istrue(isinstance(self.num, float))
+                istrue(isinstance(self.t, thing))
+        g = Group(cmd)
+        g(['--asnull'])
+        g._reset()
+        g(['--value=this is a test value', '--num=3.14159', '--t=98'])
+        g._reset()
+        g(['--value', 'this is a test value', '--num', '3.14159', '-t', '98'])
 
 
 if __name__ == '__main__':

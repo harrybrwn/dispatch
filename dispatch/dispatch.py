@@ -209,21 +209,33 @@ class Group:
             names=tuple(self._meta.flagnames()),
             __command_meta__=self._meta,
         )
+        # set all flags to a null value if no default is set
+        self._reset()
 
-    def __call__(self, argv=sys.argv, **kwrgs):
+    def __call__(self, argv=sys.argv):
         if argv is sys.argv:
             argv = argv[1:]
+        if argv and (argv[0] == '--help' or argv[0] == '-h'):
+            return self.help()
         cmd = self.parse_args(argv)
 
+        # if the command is callable and no arguments are given,
+        # we dont want to trigger the help message.
         if callable(self.inst):
             self.inst()
             if cmd is None:
                 return
         elif cmd is None:
             return self.help()
+
         ret = cmd(self.args)
-        self.args = [] # reset the args
         return ret
+
+    def _reset(self):
+        self.args = []
+        for fname in self.flags:
+            val = self._meta._defaults.get(fname)
+            self._set_flag_val(fname, val)
 
     def _get_command(self, name):
         # cannot use 'private' function or dunder methods as commands
@@ -236,7 +248,7 @@ class Group:
         elif isinstance(fn, Command):
             fn._meta.add_instance(self.inst)
             return fn
-        return Command(fn, __instance__=self.inst)
+        return Command(fn, __instance__=self.inst, __command_group__=self)
 
     def parse_args(self, args: list):
         # TODO: use the Flag.setval in addition to this method of saving
@@ -249,59 +261,94 @@ class Group:
             # we only want to find the first command it the args
             if nextcmd is None:
                 nextcmd = self._get_command(arg)
-            elif arg[0] != '-':
+
+            if arg[0] != '-':
                 self.args.append(arg)
+                continue
+
+            raw_flag = arg
+            arg = raw_flag.lstrip('-').replace('-', '_')
+            val = None
+            if '=' in arg:
+                arg, val = arg.split('=')
+
+            flag = self.flags.get(arg)
+            if flag is None:
+                if nextcmd is None:
+                    # if we have not found a sub-command yet then we should
+                    # throw and error for an unknown flag
+                    raise UserException(f'{flag.name!r} is not a flag')
+                # if the flag is not in the group, then it might be
+                # for the next command (self.args is passed the the next
+                # command).
+                self.args.append(raw_flag)
+                if val is not None:
+                    self.args.append(val)
+                continue
+
+            if flag.type is not bool:
+                if val is None:
+                    noval = False
+                    if not args:
+                        noval = True
+                    val = args.pop(0)
+
+                    if val.startswith('-'):
+                        noval = True
+                    if noval:
+                        raise UserException(
+                            f'{flag.name!r} must be given a value.')
             else:
-                raw_flag = arg
-                arg = raw_flag.lstrip('-').replace('-', '_')
-                val = None
-                if '=' in arg:
-                    arg, val = arg.split('=')
-
-                flag = self.flags.get(arg)
-                if flag is None:
-                    if nextcmd is None:
-                        # if we have not found a sub-command yet then we should
-                        # throw and error for an unknown flag
-                        raise UserException(f'{flag.name!r} is not a flag')
-                    # if the flag is not in the group, then it might be
-                    # for the next command (self.args is passed the the next
-                    # command).
-                    self.args.append(raw_flag)
-                    if val is not None:
-                        self.args.append(val)
-                    continue
-
-                if flag.type is not bool:
-                    if val is None:
-                        noval = False
-                        if not args:
-                            noval = True
-                        val = args.pop(0)
-
-                        if val.startswith('-'):
-                            noval = True
-                        if noval:
-                            raise UserException(
-                                f'{flag.name!r} must be given a value.')
-                else:
-                    if val is not None:
-                        raise UserException(f'{flag.name!r} should not be given a value.')
-                    val = True
-                self._set_flag_val(arg, val)
+                # catch the case where '=' has been used
+                if val is not None:
+                    raise UserException(f'{flag.name!r} should not be given a value.')
+                val = True
+            self._set_flag_val(arg, val)
         return nextcmd
 
     def _set_flag_val(self, name, val):
-        if name not in self.flags or not hasattr(self.inst, name):
+        if name not in self.flags:
             raise UserException(f'could not find flag {name!r}')
         flagtype = self._meta.annotations().get(name, bool)
-        setattr(self.inst, name, flagtype(val))
+
+        if val is None:
+            try:
+                val = flagtype()
+            # catch any irregularities in the type's __init__
+            except Exception:
+                val = False
+        else:
+            val = flagtype(val)
+        setattr(self.inst, name, val)
+
+    def _command_help(self):
+        docs = []
+        for c in self.commands.values():
+            if c.__doc__:
+                for line in c.__doc__.split('\n'):
+                    if line:
+                        docs.append(line.strip())
+                        break
+            else:
+                docs.append('')
+        fmt =  '  {}\n    '.join(self.commands.keys())
+        return fmt.format(*docs)
 
     def help(self):
         print(self.helptext())
 
+    # TODO: please, please fix this... also _command_help is equally shitty.
     def helptext(self):
-        ...
+        return f'''{self.doc if self.doc else ''}
+Usage:
+    {self.name} [options] [command]
+
+Options:
+{self.flags.help}
+
+Commands:
+    {self._command_help()}
+'''
 
 def helptext(fn):
     return Command(fn).helptext()
