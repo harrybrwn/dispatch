@@ -161,9 +161,7 @@ class _GroupMeta(_CliMeta):
         else:
             self._annotations = {}
 
-        # attrs = self.obj.__dict__
         attrs = self.obj.__class__.__dict__
-        # print(attrs)
 
         for name, attr in attrs.items():
             if (
@@ -180,10 +178,11 @@ class _GroupMeta(_CliMeta):
         names.update(self._annotations.keys(), self._defaults.keys())
         return names
 
-    def run(self): ...
+    def run(self):
+        raise NotImplementedError('')
 
     def params(self) -> tuple:
-        return ()
+        raise NotImplementedError
 
     def defaults(self):
         return self._defaults

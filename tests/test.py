@@ -185,6 +185,10 @@ class TestCommand(unittest.TestCase):
         def f1(verbose: bool): pass
         cmd = Command(f1)
         htext = cmd.helptext()
+        self.assertIn('Usage:\n    f1 [options]', htext)
+        self.assertIn('--verbose', htext)
+        self.assertIn('-h, --help', htext)
+        self.assertIn('Get help.', htext)
         expected = 'Usage:\n    f1 [options]\n\nOptions:\n        --verbose   \n    -h, --help      Get help.' # noqa
         self.assertTrue(htext and len(htext) > 5)
         self.assertEqual(expected, cmd.helptext())
@@ -598,9 +602,12 @@ class TestGroup(unittest.TestCase):
             t: thing
             asnull: bool = False
 
+            def __init__(self):
+                self.value = 'hello'
+
             def __call__(self):
                 if self.asnull:
-                    eq(self.value, '')
+                    eq(self.value, 'hello')
                     eq(self.num, 0.0)
                     eq(self.asnull, True)
                 else:
@@ -616,6 +623,7 @@ class TestGroup(unittest.TestCase):
         g(['--value=this is a test value', '--num=3.14159', '--t=98'])
         g._reset()
         g(['--value', 'this is a test value', '--num', '3.14159', '-t', '98'])
+        g._reset()
 
 
 if __name__ == '__main__':

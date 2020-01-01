@@ -19,7 +19,13 @@ Options:
 {%- for flg in flags %}
     {{ '{}'.format(flg) }}
     {%- if flg.has_default %} {{ flg.show_default() }}{% endif %}
-{%- endfor %}
+{%- endfor -%}
+
+{% if command_help %}
+
+Commands:
+    {{ command_help() }}
+{%- endif %}
 '''
 
 
@@ -57,16 +63,16 @@ class Command:
 
         self._meta = _FunctionMeta(
             self.callback,
-            instance=kwrgs.get('__instance__')
+            instance=kwrgs.pop('__instance__', None)
         )
         self.flagnames = self._meta.params()
         self._help = self._meta.helpstr
-        self._usage = kwrgs.get('usage', f'{self._meta.name} [options]')
+        self._usage = kwrgs.pop('usage', f'{self._meta.name} [options]')
 
-        self._help = kwrgs.get('help', self._help)
-        self.help_template = kwrgs.get('help_template', HELP_TMPL)
-        self.doc_help = kwrgs.get('doc_help', False)
-        self.allow_null = kwrgs.get('allow_null', True)
+        self._help = kwrgs.pop('help', self._help)
+        self.help_template = kwrgs.pop('help_template', HELP_TMPL)
+        self.doc_help = kwrgs.pop('doc_help', False)
+        self.allow_null = kwrgs.pop('allow_null', True)
 
         self.args = []
         self.flags = FlagSet(
@@ -110,6 +116,7 @@ class Command:
             'main_doc': self._help,
             'usage': self._usage,
             'flags': flags,
+            'command_help': None,
         })
 
     def parse_args(self, args: list) -> dict:
@@ -192,6 +199,14 @@ def _find_commands(obj):
 
 class Group:
     def __init__(self, obj, *args, **kwrgs):
+        '''
+    Args:
+        obj: a class that will be used as the command group
+        '''
+        self.help_template = kwrgs.pop('help_template', HELP_TMPL)
+        self.doc_help = kwrgs.pop('doc_help', False)
+        self._usage = kwrgs.pop('usage', None)
+
         if isinstance(obj, type):
             self.inst = obj(*args, **kwrgs)
             self.type = obj
@@ -201,16 +216,19 @@ class Group:
 
         self.args = []
         self.name = self.type.__name__
+        self._usage = self._usage or f'{self.name} [options] [command]'
         self.doc = self.inst.__doc__
         self.commands = dict(_find_commands(self.type))
         self._meta = _GroupMeta(self.inst)
-
         self.flags = FlagSet(
             names=tuple(self._meta.flagnames()),
             __command_meta__=self._meta,
+            **kwrgs,
         )
-        # set all flags to a null value if no default is set
-        self._reset()
+        # set all flags to some null value if no default is set
+        for fname in self.flags:
+            if not hasattr(self.inst, fname):
+                self._set_flag_val(fname, self._meta._defaults.get(fname))
 
     def __call__(self, argv=sys.argv):
         if argv is sys.argv:
@@ -277,7 +295,7 @@ class Group:
                 if nextcmd is None:
                     # if we have not found a sub-command yet then we should
                     # throw and error for an unknown flag
-                    raise UserException(f'{flag.name!r} is not a flag')
+                    raise UserException(f'{arg!r} is not a flag')
                 # if the flag is not in the group, then it might be
                 # for the next command (self.args is passed the the next
                 # command).
@@ -316,7 +334,7 @@ class Group:
                 val = flagtype()
             # catch any irregularities in the type's __init__
             except Exception:
-                val = False
+                val = False # default is bool
         else:
             val = flagtype(val)
         setattr(self.inst, name, val)
@@ -337,18 +355,22 @@ class Group:
     def help(self):
         print(self.helptext())
 
-    # TODO: please, please fix this... also _command_help is equally shitty.
     def helptext(self):
-        return f'''{self.doc if self.doc else ''}
-Usage:
-    {self.name} [options] [command]
+        if self.doc_help:
+            return self._meta.doc
 
-Options:
-{self.flags.help}
+        flags = list(self.flags.visible_flags())
+        fmt_len = self.flags.format_len
+        for f in flags:
+            f.f_len = fmt_len
 
-Commands:
-    {self._command_help()}
-'''
+        tmpl = jinja2.Template(self.help_template)
+        return tmpl.render({
+            'main_doc': self.doc,
+            'usage': self._usage,
+            'flags': flags,
+            'command_help': self._command_help,
+        })
 
 def helptext(fn):
     return Command(fn).helptext()
