@@ -1,11 +1,11 @@
 import sys
-import jinja2
+import inspect
+from types import FunctionType, MethodType
 
 from .flags import FlagSet
 from ._meta import _FunctionMeta, _GroupMeta, _isgroup
+from ._base import _BaseCommand
 from .exceptions import UserException, DeveloperException, RequiredFlagError
-import inspect
-from types import FunctionType, MethodType
 
 
 HELP_TMPL = '''{%- if main_doc -%}
@@ -29,7 +29,7 @@ Commands:
 '''
 
 
-class Command:
+class Command(_BaseCommand):
 
     def __init__(self, callback, **kwrgs):
         # note: docs are modified at runtime
@@ -98,26 +98,6 @@ class Command:
 
     def __str__(self):
         return self.helptext()
-
-    def help(self):
-        print(self.helptext())
-
-    def helptext(self) -> str:
-        if self.doc_help:
-            return self.callback.__doc__
-
-        flags = list(self.flags.visible_flags())
-        fmt_len = self.flags.format_len
-        for f in flags:
-            f.f_len = fmt_len
-
-        tmpl = jinja2.Template(self.help_template)
-        return tmpl.render({
-            'main_doc': self._help,
-            'usage': self._usage,
-            'flags': flags,
-            'command_help': None,
-        })
 
     def parse_args(self, args: list) -> dict:
         '''
@@ -197,7 +177,7 @@ def _find_commands(obj):
             yield name, attr
 
 
-class Group:
+class Group(_BaseCommand):
     def __init__(self, obj, *args, **kwrgs):
         '''
     Args:
@@ -217,7 +197,7 @@ class Group:
         self.args = []
         self.name = self.type.__name__
         self._usage = self._usage or f'{self.name} [options] [command]'
-        self.doc = self.inst.__doc__
+        self._help = kwrgs.pop('help', self.inst.__doc__)
         self.commands = dict(_find_commands(self.type))
         self._meta = _GroupMeta(self.inst)
         self.flags = FlagSet(
@@ -246,8 +226,7 @@ class Group:
         elif cmd is None:
             return self.help()
 
-        ret = cmd(self.args)
-        return ret
+        return cmd(self.args)
 
     def _reset(self):
         self.args = []
@@ -351,26 +330,6 @@ class Group:
                 docs.append('')
         fmt =  '  {}\n    '.join(self.commands.keys())
         return fmt.format(*docs)
-
-    def help(self):
-        print(self.helptext())
-
-    def helptext(self):
-        if self.doc_help:
-            return self._meta.doc
-
-        flags = list(self.flags.visible_flags())
-        fmt_len = self.flags.format_len
-        for f in flags:
-            f.f_len = fmt_len
-
-        tmpl = jinja2.Template(self.help_template)
-        return tmpl.render({
-            'main_doc': self.doc,
-            'usage': self._usage,
-            'flags': flags,
-            'command_help': self._command_help,
-        })
 
 def helptext(fn):
     return Command(fn).helptext()
