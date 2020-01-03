@@ -258,6 +258,7 @@ class Group(_BaseCommand):
             # we only want to find the first command it the args
             if nextcmd is None:
                 nextcmd = self._get_command(arg)
+                continue
 
             if arg[0] != '-':
                 self.args.append(arg)
@@ -272,8 +273,9 @@ class Group(_BaseCommand):
             flag = self.flags.get(arg)
             if flag is None:
                 if nextcmd is None:
-                    # if we have not found a sub-command yet then we should
-                    # throw and error for an unknown flag
+                    # if we have not found a sub-command yet then the unkown
+                    # flag should not be passed on to any other commands we
+                    # should throw and error for an unknown flag
                     raise UserException(f'{arg!r} is not a flag')
                 # if the flag is not in the group, then it might be
                 # for the next command (self.args is passed the the next
