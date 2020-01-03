@@ -120,6 +120,21 @@ class Option:
             else:
                 self._value = self.type(val)
 
+    def _getnull(self):
+        '''_getnull will return a null value given the flag's type.
+        If there is a default value, that will be returned.
+        '''
+        if self.has_default:
+            return self.value
+
+        return self.type()
+        try:
+            return self.type()
+        except TypeError:
+            # if the constructory needs an argument
+            # then we cant do much so return None
+            return None
+
 
 class FlagSet:
     '''A Set of cli Flags'''

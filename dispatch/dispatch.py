@@ -205,10 +205,24 @@ class Group(_BaseCommand):
             __command_meta__=self._meta,
             **kwrgs,
         )
-        # set all flags to some null value if no default is set
-        for fname in self.flags:
-            if not hasattr(self.inst, fname):
-                self._set_flag_val(fname, self._meta._defaults.get(fname))
+
+        def new_getattr(this, name):
+            if name in self.flags:
+                flag = self.flags[name]
+                return flag.value or flag._getnull()
+            else:
+                return object.__getattribute__(this, name)
+
+        def new_setattr(this, name, val):
+            if name in self.flags:
+                flag = self.flags[name]
+                if not isinstance(val, flag.type):
+                    val = flag.type(val)
+                flag._value = val
+            object.__setattr__(this, name, val)
+
+        self.type.__getattr__ = new_getattr
+        self.type.__setattr__ = new_setattr
 
     def __call__(self, argv=sys.argv):
         if argv is sys.argv:
@@ -304,7 +318,11 @@ class Group(_BaseCommand):
                 if val is not None:
                     raise UserException(f'{flag.name!r} should not be given a value.')
                 val = True
-            self._set_flag_val(arg, val)
+                flag.type = bool
+            # print(val)
+            # flag.setval(val)
+            # self._set_flag_val(arg, val)
+            setattr(self.inst, arg, val)
         return nextcmd
 
     def _set_flag_val(self, name, val):
