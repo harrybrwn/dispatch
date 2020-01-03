@@ -258,7 +258,9 @@ class Group(_BaseCommand):
             # we only want to find the first command it the args
             if nextcmd is None:
                 nextcmd = self._get_command(arg)
-                continue
+                # if it was found we skip the flag/arg parsing
+                if nextcmd is not None:
+                    continue
 
             if arg[0] != '-':
                 self.args.append(arg)
@@ -308,7 +310,7 @@ class Group(_BaseCommand):
     def _set_flag_val(self, name, val):
         if name not in self.flags:
             raise UserException(f'could not find flag {name!r}')
-        flagtype = self._meta.annotations().get(name, bool)
+        flagtype = self._meta._annotations.get(name, bool)
 
         if val is None:
             try:
@@ -332,6 +334,7 @@ class Group(_BaseCommand):
                 docs.append('')
         fmt =  '  {}\n    '.join(self.commands.keys())
         return fmt.format(*docs)
+
 
 def helptext(fn):
     return Command(fn).helptext()
