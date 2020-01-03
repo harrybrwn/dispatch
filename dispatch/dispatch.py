@@ -199,6 +199,7 @@ class Group(_BaseCommand):
         self._usage = self._usage or f'{self.name} [options] [command]'
         self._help = kwrgs.pop('help', self.inst.__doc__)
         self.commands = dict(_find_commands(self.type))
+
         self._meta = _GroupMeta(self.inst)
         self.flags = FlagSet(
             names=tuple(self._meta.flagnames()),

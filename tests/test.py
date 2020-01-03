@@ -451,8 +451,6 @@ class TestHelpers(unittest.TestCase):
 
 class TestMeta(unittest.TestCase):
     def testFunctionMeta(self):
-        import inspect
-
         def f(*args, name: str, verbose, file='/dev/null'):
             var = 'hello'
             new_const = 55
@@ -553,13 +551,16 @@ class TestGroup(unittest.TestCase):
                 '''Sub command of CMD'''
                 test.assertEqual(self.filename, 'test.txt')
                 test.assertTrue(flag)
+                test.assertTrue(isinstance(flag, bool))
 
             def other(self, flag: bool):
                 '''Sub command of CMD'''
+                test.assertTrue(isinstance(flag, bool))
 
             def hello(self, testing: str):
                 '''Sub command of CMD'''
                 test.assertEqual(testing, 'what the heck')
+                test.assertTrue(isinstance(testing, str))
 
         self.assertIn('cmd', CMD.commands)
         self.assertIn('hello', CMD.commands)
@@ -593,6 +594,7 @@ class TestGroup(unittest.TestCase):
         eq = self.assertEqual
         istrue = self.assertTrue
 
+        # TODO: make this work without calling int(val)
         class thing:
             def __init__(self, val=0): self.val = int(val)
 
@@ -604,6 +606,7 @@ class TestGroup(unittest.TestCase):
 
             def __init__(self):
                 self.value = 'hello'
+                eq(self.value, 'hello')
 
             def __call__(self):
                 if self.asnull:
@@ -614,11 +617,15 @@ class TestGroup(unittest.TestCase):
                     eq(self.value, 'this is a test value')
                     eq(self.num, 3.14159)
                     eq(self.t.val, 98)
+                istrue(isinstance(self.asnull, bool))
                 istrue(isinstance(self.value, str))
                 istrue(isinstance(self.num, float))
                 istrue(isinstance(self.t, thing))
         g = Group(cmd)
         g(['--asnull'])
+        self.assertEqual(g.inst.value, 'hello')
+        self.assertEqual(g.flags['value'].value, 'hello')
+        return
         g._reset()
         g(['--value=this is a test value', '--num=3.14159', '--t=98'])
         g._reset()

@@ -161,6 +161,16 @@ class _GroupMeta(_CliMeta):
         else:
             self._annotations = {}
 
+        # this is for any attributes that have been set inside
+        # the object's init function.
+        for name, attr in self.obj.__dict__.items():
+            if (
+                not name.startswith('_') and
+                not _isfunc(attr)
+            ):
+                self._defaults[name] = attr
+                self._annotations[name] = type(attr)
+
         attrs = self.obj.__class__.__dict__
 
         for name, attr in attrs.items():
