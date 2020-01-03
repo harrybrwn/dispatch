@@ -125,7 +125,7 @@ class Option:
         If there is a default value, that will be returned.
         '''
         if self.has_default:
-            return self.value
+            return self._default
 
         return self.type()
         try:
@@ -134,6 +134,9 @@ class Option:
             # if the constructory needs an argument
             # then we cant do much so return None
             return None
+
+    def _reset(self):
+        self._value = self._getnull()
 
 
 class FlagSet:

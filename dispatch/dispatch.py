@@ -244,9 +244,8 @@ class Group(_BaseCommand):
 
     def _reset(self):
         self.args = []
-        for fname in self.flags:
-            val = self._meta._defaults.get(fname)
-            self._set_flag_val(fname, val)
+        for f in self.flags.values():
+            setattr(self.inst, f.name, f._getnull())
 
     def _get_command(self, name):
         # cannot use 'private' function or dunder methods as commands
@@ -319,9 +318,6 @@ class Group(_BaseCommand):
                     raise UserException(f'{flag.name!r} should not be given a value.')
                 val = True
                 flag.type = bool
-            # print(val)
-            # flag.setval(val)
-            # self._set_flag_val(arg, val)
             setattr(self.inst, arg, val)
         return nextcmd
 
