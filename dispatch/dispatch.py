@@ -7,6 +7,8 @@ from ._meta import _FunctionMeta, _GroupMeta, _isgroup
 from ._base import _BaseCommand
 from .exceptions import UserException, DeveloperException, RequiredFlagError
 
+from typing import Optional, List, Generator, Callable
+
 
 HELP_TMPL = '''{%- if main_doc -%}
 {{ main_doc }}
@@ -31,7 +33,7 @@ Commands:
 
 class Command(_BaseCommand):
 
-    def __init__(self, callback, **kwrgs):
+    def __init__(self, callback: Callable, **kwrgs):
         # note: docs are modified at runtime
         '''
         Args:
@@ -163,7 +165,7 @@ class Command(_BaseCommand):
         return values
 
 
-def _find_commands(obj):
+def _find_commands(obj) -> Generator[tuple, None, None]:
     for name, attr in obj.__dict__.items():
         ok = (
             not name.startswith('_') and
@@ -196,6 +198,7 @@ class Group(_BaseCommand):
             self.inst = obj(*args, **kwrgs) # TODO: find a way to make this safer
             self.type = obj
         else:
+            ...
             self.inst = obj
             self.type = obj.__class__
 
@@ -219,7 +222,7 @@ class Group(_BaseCommand):
             else:
                 return object.__getattribute__(this, name)
 
-        def new_setattr(this, name, val):
+        def new_setattr(this, name: str, val):
             if name in self.flags:
                 flag = self.flags[name]
                 if not isinstance(val, flag.type):
@@ -230,7 +233,7 @@ class Group(_BaseCommand):
         self.type.__getattr__ = new_getattr
         self.type.__setattr__ = new_setattr
 
-    def __call__(self, argv=sys.argv):
+    def __call__(self, argv: List[str] = sys.argv):
         if argv is sys.argv:
             argv = argv[1:]
         if argv and (argv[0] == '--help' or argv[0] == '-h'):
@@ -257,21 +260,15 @@ class Group(_BaseCommand):
     def iscommand(self, name: str) -> bool:
         return not name.startswith('_') and name in self.commands
 
-    def _get_command(self, name: str):
-        # cannot use 'private' function or dunder methods as commands
-        if name.startswith('_'):
-            return None
+    def _get_command(self, name: str) -> Command:
         fn = self.commands.get(name)
-
-        if fn is None:
-            return None
 
         if isinstance(fn, Command):
             fn._meta.add_instance(self.inst)
             return fn
         return Command(fn, __instance__=self.inst, __command_group__=self)
 
-    def parse_args(self, args: list):
+    def parse_args(self, args: List[str]) -> Optional[Command]:
         # TODO: use the Flag.setval in addition to this method of saving
         # the variable.
         nextcmd = None
@@ -307,8 +304,7 @@ class Group(_BaseCommand):
                 if val is not None:
                     self.args.append(val)
                 continue
-
-            if flag.type is not bool:
+            elif flag.type is not bool:
                 if val is None:
                     if not args or args[0].startswith('-'):
                         raise UserException(
@@ -322,7 +318,7 @@ class Group(_BaseCommand):
             setattr(self.inst, arg, val)
         return nextcmd
 
-    def _command_help(self):
+    def _command_help(self) -> str:
         docs = []
         for c in self.commands.values():
             if c.__doc__:
@@ -336,7 +332,7 @@ class Group(_BaseCommand):
         return fmt.format(*docs)
 
 
-def helptext(fn):
+def helptext(fn) -> str:
     return Command(fn).helptext()
 
 

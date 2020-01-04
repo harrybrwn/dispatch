@@ -643,6 +643,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(g.inst.t.val, 98)
         g._reset()
 
+    # converted to pytest
     def testBoolParse(self):
         negate = True
         @command
@@ -662,7 +663,6 @@ class TestGroup(unittest.TestCase):
         negate = False
         C._reset()
         C(['--yes', '--needsval', 'this is a val'])
-
         self.assertRaises(UserException, C, ['--needsval', '--verbose'])
         self.assertRaises(UserException, C, ['--needsval'])
         self.assertRaises(UserException, C, ['--yes=what?'])

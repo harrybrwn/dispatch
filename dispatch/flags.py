@@ -13,7 +13,7 @@ class Option:
                  'hidden', '_default', 'has_default', 'f_len')
 
     def __init__(self, name, typ, *,
-                 shorthand=None, help=None, value=None,
+                 shorthand: str = None, help: str = None, value=None,
                  hidden=False, has_default=False):
         self.name = name
         self.type = typ if typ is not None else bool
@@ -31,7 +31,7 @@ class Option:
             raise DeveloperException(
                 "cannot use 'h' as shorthand (reserved for --help)")
 
-    def __format__(self, spec):
+    def __format__(self, spec: str):
         name_spec = f'<{self.f_len}'
         prefix = ''
         if spec:
