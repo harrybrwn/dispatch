@@ -238,20 +238,18 @@ def some_cli(file: str, verbose: bool, time: str = 'local',
 
 def testHelp():
     got = some_cli.helptext()
-    h = '''Some_cli is just some generic cli tool
-that has a multi-line description.'''
-    assert 'Some_cli is just some generic cli tool' in got
-    assert 'that has a multi-line description.' in got
-    assert got.startswith('Some_cli is just some generic cli tool')
-    assert '-f, --file' in got
-    assert 'Give the cli a file' in got
-    assert '-v, --verbose' in got
-    assert 'Print out all the information to stdout' in got
-    assert '--time' in got
-    assert 'Use some other time (default: local)' in got
-    assert '-o, --output' in got
-    assert 'Give the program an output file (default: stdout)' in got
-    assert '-h, --help' in got
+    assert got.startswith('Some_cli is just some generic cli tool\n')
+    tc = [
+        'Some_cli is just some generic cli tool\n',
+        'that has a multi-line description.\n',
+        '-f, --file',    'Give the cli a file\n',
+        '-v, --verbose', 'Print out all the information to stdout\n',
+        '--time',        'Use some other time (default: local)\n',
+        '-o, --output',  'Give the program an output file (default: stdout)\n',
+        '-h, --help',
+    ]
+    for t in tc:
+        assert t in got
 
 def testArgParsing():
     @command

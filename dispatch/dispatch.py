@@ -26,7 +26,7 @@ Options:
 {% if command_help %}
 
 Commands:
-    {{ command_help() }}
+{{ command_help() }}
 {%- endif %}
 '''
 
@@ -320,6 +320,9 @@ class Group(_BaseCommand):
 
     def _command_help(self) -> str:
         docs = []
+        l = max([len(k) for k in self.commands.keys()])
+        fmt = '\n'.join([f'    {k:<{l}} {"{}"}' for k in self.commands.keys()])
+
         for c in self.commands.values():
             if c.__doc__:
                 for line in c.__doc__.split('\n'):
@@ -328,7 +331,6 @@ class Group(_BaseCommand):
                         break
             else:
                 docs.append('')
-        fmt =  '  {}\n    '.join(self.commands.keys())
         return fmt.format(*docs)
 
 
