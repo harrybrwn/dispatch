@@ -65,7 +65,6 @@ class Command(_BaseCommand):
             self.callback,
             instance=kwrgs.pop('__instance__', None)
         )
-        self.flagnames = self._meta.params()
         self._help = self._meta.helpstr
         self._usage = kwrgs.pop('usage', f'{self._meta.name} [options]')
 
@@ -180,15 +179,21 @@ def _find_commands(obj):
 class Group(_BaseCommand):
     def __init__(self, obj, *args, **kwrgs):
         '''
-    Args:
-        obj: a class that will be used as the command group
+        Args:
+            obj: a class that will be used as the command groups
+
+        Keyword args:
+            usage:
+            help_template:
+            doc_help:
+            help:
         '''
         self.help_template = kwrgs.pop('help_template', HELP_TMPL)
         self.doc_help = kwrgs.pop('doc_help', False)
         self._usage = kwrgs.pop('usage', None)
 
         if isinstance(obj, type):
-            self.inst = obj(*args, **kwrgs)
+            self.inst = obj(*args, **kwrgs) # TODO: find a way to make this safer
             self.type = obj
         else:
             self.inst = obj
@@ -197,10 +202,10 @@ class Group(_BaseCommand):
         self.args = []
         self.name = self.type.__name__
         self._usage = self._usage or f'{self.name} [options] [command]'
-        self._help = kwrgs.pop('help', self.inst.__doc__)
         self.commands = dict(_find_commands(self.type))
 
         self._meta = _GroupMeta(self.inst)
+        self._help = kwrgs.pop('help', self._meta.helpstr)
         self.flags = FlagSet(
             names=tuple(self._meta.flagnames()),
             __command_meta__=self._meta,
@@ -239,7 +244,8 @@ class Group(_BaseCommand):
             if cmd is None:
                 return
         elif cmd is None:
-            return self.help()
+            self.help()
+            sys.exit(1)
 
         return cmd(self.args)
 
@@ -248,7 +254,10 @@ class Group(_BaseCommand):
         for f in self.flags.values():
             setattr(self.inst, f.name, f._getnull())
 
-    def _get_command(self, name):
+    def iscommand(self, name: str) -> bool:
+        return not name.startswith('_') and name in self.commands
+
+    def _get_command(self, name: str):
         # cannot use 'private' function or dunder methods as commands
         if name.startswith('_'):
             return None
@@ -256,7 +265,8 @@ class Group(_BaseCommand):
 
         if fn is None:
             return None
-        elif isinstance(fn, Command):
+
+        if isinstance(fn, Command):
             fn._meta.add_instance(self.inst)
             return fn
         return Command(fn, __instance__=self.inst, __command_group__=self)
@@ -268,20 +278,17 @@ class Group(_BaseCommand):
         while args:
             # Need to find either a command or a flag
             # otherwise, add an argument an move on.
-            arg = args.pop(0)
+            raw_arg = args.pop(0)
             # we only want to find the first command it the args
-            if nextcmd is None:
-                nextcmd = self._get_command(arg)
-                # if it was found we skip the flag/arg parsing
-                if nextcmd is not None:
-                    continue
-
-            if arg[0] != '-':
-                self.args.append(arg)
+            if nextcmd is None and self.iscommand(raw_arg):
+                nextcmd = self._get_command(raw_arg)
                 continue
 
-            raw_flag = arg
-            arg = raw_flag.lstrip('-').replace('-', '_')
+            if raw_arg[0] != '-':
+                self.args.append(raw_arg)
+                continue
+
+            arg = raw_arg.lstrip('-').replace('-', '_')
             val = None
             if '=' in arg:
                 arg, val = arg.split('=')
@@ -296,46 +303,24 @@ class Group(_BaseCommand):
                 # if the flag is not in the group, then it might be
                 # for the next command (self.args is passed the the next
                 # command).
-                self.args.append(raw_flag)
+                self.args.append(raw_arg)
                 if val is not None:
                     self.args.append(val)
                 continue
 
             if flag.type is not bool:
                 if val is None:
-                    noval = False
-                    if not args:
-                        noval = True
-                    val = args.pop(0)
-
-                    if val.startswith('-'):
-                        noval = True
-                    if noval:
+                    if not args or args[0].startswith('-'):
                         raise UserException(
-                            f'{flag.name!r} must be given a value.')
+                            f'{arg!r} must be given a value.')
+                    val = args.pop(0)
             else:
                 # catch the case where '=' has been used
                 if val is not None:
-                    raise UserException(f'{flag.name!r} should not be given a value.')
+                    raise UserException(f'{arg!r} should not be given a value.')
                 val = True
-                flag.type = bool
             setattr(self.inst, arg, val)
         return nextcmd
-
-    def _set_flag_val(self, name, val):
-        if name not in self.flags:
-            raise UserException(f'could not find flag {name!r}')
-        flagtype = self._meta._annotations.get(name, bool)
-
-        if val is None:
-            try:
-                val = flagtype()
-            # catch any irregularities in the type's __init__
-            except Exception:
-                val = False # default is bool
-        else:
-            val = flagtype(val)
-        setattr(self.inst, name, val)
 
     def _command_help(self):
         docs = []

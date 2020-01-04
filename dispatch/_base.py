@@ -3,6 +3,9 @@ import jinja2
 
 class _BaseCommand:
 
+    def __init__(self, **kwrgs):
+        pass
+
     def help(self):
         print(self.helptext())
 

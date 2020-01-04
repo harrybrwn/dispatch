@@ -625,12 +625,48 @@ class TestGroup(unittest.TestCase):
         g(['--asnull'])
         self.assertEqual(g.inst.value, 'hello')
         self.assertEqual(g.flags['value'].value, 'hello')
-        return
         g._reset()
         g(['--value=this is a test value', '--num=3.14159', '--t=98'])
+        self.assertEqual(g.flags['value'].value, 'this is a test value')
+        self.assertEqual(g.inst.value, 'this is a test value')
+        self.assertEqual(g.flags['num'].value, 3.14159)
+        self.assertEqual(g.inst.num, 3.14159)
+        self.assertEqual(g.flags['t'].value.val, 98)
+        self.assertEqual(g.inst.t.val, 98)
         g._reset()
         g(['--value', 'this is a test value', '--num', '3.14159', '-t', '98'])
+        self.assertEqual(g.flags['value'].value, 'this is a test value')
+        self.assertEqual(g.inst.value, 'this is a test value')
+        self.assertEqual(g.flags['num'].value, 3.14159)
+        self.assertEqual(g.inst.num, 3.14159)
+        self.assertEqual(g.flags['t'].value.val, 98)
+        self.assertEqual(g.inst.t.val, 98)
         g._reset()
+
+    def testBoolParse(self):
+        negate = True
+        @command
+        class C:
+            verbose: bool
+            yes: bool
+            needsval: str
+            def __call__(self):
+                if negate:
+                    assert self.verbose
+                    assert not self.yes
+                else:
+                    assert not self.verbose
+                    assert self.yes
+                assert self.needsval
+        C(['--verbose', '--needsval=hello'])
+        negate = False
+        C._reset()
+        C(['--yes', '--needsval', 'this is a val'])
+
+        self.assertRaises(UserException, C, ['--needsval', '--verbose'])
+        self.assertRaises(UserException, C, ['--needsval'])
+        self.assertRaises(UserException, C, ['--yes=what?'])
+        self.assertRaises(UserException, C, ['--verbose=True'])
 
 
 if __name__ == '__main__':
