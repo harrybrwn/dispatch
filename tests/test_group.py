@@ -43,7 +43,7 @@ def testGroupInit():
     assert isinstance(g.type, type)
     assert isinstance(g.inst, g.type)
     assert not C.a_value
-    g()
+    g([])
     assert C.a_value
 
     g = Group(C())

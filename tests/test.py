@@ -66,7 +66,7 @@ class TestCommand(unittest.TestCase):
         def __init(self, name):
             self.name = name
 
-    EMPTY_HELP = expected = 'Usage:\n    {name} [options]\n\nOptions:\n    -h, --help   Get help.' # noqa
+    EMPTY_HELP = 'Usage:\n    {name} [options]\n\nOptions:\n    -h, --help   Get help.' # noqa
 
     def testGeneralCommand(self):
         self.assertTrue(some_cli is not None)
