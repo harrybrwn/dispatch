@@ -210,7 +210,7 @@ def test_command_settings():
 -h, --help'''
         assert some_string is None
     assert f3.helptext() == 'this is the raw documentation\n-h, --help'
-    f3()  # pylint: disable=no-value-for-parameter
+    f3([])  # pylint: disable=no-value-for-parameter
 
 def test_variadic_command():
     @command
