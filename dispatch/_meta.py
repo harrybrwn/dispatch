@@ -1,13 +1,17 @@
 import sys
-from dataclasses import is_dataclass
-import types
-from types import FunctionType, MethodType
 import inspect
 from abc import ABC, abstractmethod
+from dataclasses import is_dataclass
+
+from types import FunctionType, MethodType
+from typing import Dict, Set, Any
+
 from .exceptions import UserException
 
 
 class _CliMeta(ABC):
+    flagdocs: dict
+
     @abstractmethod
     def run(self, *args, **kwrgs): ...
 
@@ -36,7 +40,7 @@ class _CliMeta(ABC):
 
 
 def _parse_flags_doc(doc: str):
-    res = {}
+    res: Dict[str, Any] = {}
     s = doc[doc.index(':'):]
 
     for line in s.split('\n'):
@@ -184,7 +188,7 @@ class _GroupMeta(_CliMeta):
         self.helpstr, self.flagdocs = self._parse_doc(self.doc)
 
     def flagnames(self) -> set:
-        names = set()
+        names: Set[str] = set()
         names.update(self._annotations.keys(), self._defaults.keys())
         return names
 
@@ -207,11 +211,11 @@ def _run_group(root, *, run=None, kwargs=None): ...
 def _isgroup(obj) -> bool:
     return not isinstance(obj, (
         classmethod, staticmethod,
-        types.FunctionType, types.MethodType
+        FunctionType, MethodType
     ))
 
 def _isfunc(obj) -> bool:
     return isinstance(obj, (
         classmethod, staticmethod,
-        types.FunctionType, types.MethodType
+        FunctionType, MethodType
     ))

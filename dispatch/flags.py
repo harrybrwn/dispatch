@@ -1,5 +1,5 @@
 import sys
-import typing
+from typing import Dict, Optional
 from collections.abc import Iterable
 from dataclasses import is_dataclass
 
@@ -147,7 +147,7 @@ class FlagSet:
 
     __slots__ = ('_flags', '_flagnames', '_shorthands')
 
-    def __init__(self, *, names: list = None, defaults: dict = None,
+    def __init__(self, *, names: tuple = None, defaults: dict = None,
                  docs: dict = None, types: dict = None,
                  shorthands: dict = None, hidden: set = set(), **kwrgs):
         '''
@@ -164,7 +164,7 @@ class FlagSet:
             hidden: `set` of the flagnames that will be hidden from the help
                 text of the FlagSet.
         '''
-        self._flags = {}
+        self._flags: Dict[str, Option] = {}
         self._flagnames = names or ()
         self._shorthands = shorthands or dict()
 
@@ -172,7 +172,7 @@ class FlagSet:
         defaults = defaults or dict()
         docs = docs or dict()
 
-        cmd_meta = kwrgs.get('__command_meta__')
+        cmd_meta: Optional[_CliMeta] = kwrgs.get('__command_meta__')
         if cmd_meta:
             if not isinstance(cmd_meta, _CliMeta):
                 raise TypeError('__command_meta__ should inherit from _meta._CliMeta')
@@ -261,6 +261,7 @@ class FlagSet:
 def _from_typing_module(t) -> bool:
     if hasattr(t, '__module__'):
         mod = t.__module__
+        import typing
         return sys.modules[mod] == typing
     return False
 

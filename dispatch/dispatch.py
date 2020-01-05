@@ -7,7 +7,7 @@ from ._meta import _FunctionMeta, _GroupMeta, _isgroup
 from ._base import _BaseCommand
 from .exceptions import UserException, DeveloperException, RequiredFlagError
 
-from typing import Optional, List, Generator, Callable
+from typing import Optional, List, Generator, Callable, Any
 
 
 HELP_TMPL = '''{%- if main_doc -%}
@@ -75,7 +75,7 @@ class Command(_BaseCommand):
         self.doc_help = kwrgs.pop('doc_help', False)
         self.allow_null = kwrgs.pop('allow_null', True)
 
-        self.args = []
+        self.args: List[str] = []
         self.flags = FlagSet(
             names=self._meta.params(),
             __command_meta__=self._meta,
@@ -286,7 +286,7 @@ class Group(_BaseCommand):
                 continue
 
             arg = raw_arg.lstrip('-').replace('-', '_')
-            val = None
+            val: Any = None
             if '=' in arg:
                 arg, val = arg.split('=')
 

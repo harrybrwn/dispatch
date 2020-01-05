@@ -213,7 +213,7 @@ def test_group_init_fail():
             assert three == 3
 
 @pytest.mark.xfail
-def test_group_init_fail():
+def test_group_init_fail_2():
     @command
     class cmd:
         def __init__(self, an_arg):
