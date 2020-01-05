@@ -1,6 +1,7 @@
 # Testing
 /benchmarks/
 /.pytest_cache
+.coverage
 
 # Build
 *.egg-info
