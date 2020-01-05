@@ -251,10 +251,10 @@ class FlagSet:
             return default
 
     def visible_flags(self):
-        for flag in self._flags.values():
-            if flag.hidden:
-                continue
-            yield flag
+        yield from (
+            flag for flag in self._flags.values()
+            if not flag.hidden
+        )
         yield self.DEFAULT_HELP_FLAG
 
 

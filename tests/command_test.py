@@ -5,8 +5,8 @@ import sys
 from os.path import dirname, realpath
 sys.path.insert(0, dirname(dirname(realpath(__file__))))
 
-from dispatch import command, UserException
-from dispatch.dispatch import Command
+from dispatch.exceptions import UserException, DeveloperException
+from dispatch.dispatch import Command, command
 from dispatch._meta import _parse_flags_doc, _FunctionMeta
 
 def test_command():
@@ -272,3 +272,7 @@ def testArgParsing():
     assert cli.args == ['argument', 'a value', 'another-value']
     with raises(UserException):
         cli(['argument', '-debug', '--time'])
+
+def test_none_command():
+    with raises(DeveloperException):
+        c = Command(None)

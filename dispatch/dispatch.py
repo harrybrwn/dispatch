@@ -261,7 +261,7 @@ class Group(_BaseCommand):
         return not name.startswith('_') and name in self.commands
 
     def _get_command(self, name: str) -> Command:
-        fn = self.commands.get(name)
+        fn = self.commands[name]
 
         if isinstance(fn, Command):
             fn._meta.add_instance(self.inst)
@@ -307,8 +307,7 @@ class Group(_BaseCommand):
             elif flag.type is not bool:
                 if val is None:
                     if not args or args[0].startswith('-'):
-                        raise UserException(
-                            f'{arg!r} must be given a value.')
+                        raise UserException(f'{arg!r} must be given a value.')
                     val = args.pop(0)
             else:
                 # catch the case where '=' has been used
@@ -321,7 +320,10 @@ class Group(_BaseCommand):
     def _command_help(self) -> str:
         docs = []
         l = max([len(k) for k in self.commands.keys()])
-        fmt = '\n'.join([f'    {k:<{l}} {"{}"}' for k in self.commands.keys()])
+        fmt = '\n'.join([
+            f'    {k:<{l}} {"{}"}'
+            for k in self.commands.keys()
+        ])
 
         for c in self.commands.values():
             if c.__doc__:

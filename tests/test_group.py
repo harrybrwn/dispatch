@@ -76,11 +76,11 @@ def testArgParsing():
             assert isinstance(flag, bool)
 
         def other(self, flag: bool):
-            '''Sub command of CMD'''
+            '''Sub command of the CMD command'''
             assert isinstance(flag, bool)
 
         def hello(self, testing: str):
-            '''Sub command of CMD'''
+            '''Sub-command of CMD'''
             assert testing == 'what the heck'
             assert isinstance(testing, str)
 
@@ -97,10 +97,15 @@ def testArgParsing():
     CMD.args = []
     CMD(['hello', '--testing=what the heck'])
     helptxt = CMD.helptext()
-    assert 'CMD' in helptxt
-    assert 'Sub command of CMD' in helptxt
-    assert '--verbose' in helptxt
-    assert '--filename' in helptxt
+
+    tests = [
+        'CMD', '--verbose', '--filename',
+        'cmd   Sub command of CMD',
+        'other Sub command of the CMD command',
+        'hello Sub-command of CMD',
+    ]
+    for t in tests:
+        assert t in helptxt
 
 def testFindCommands():
     class cmd:
@@ -189,3 +194,27 @@ def test_bool_parse():
         C(['--needsval'])
         C(['--yes=what?'])
         C(['--verbose=True'])
+
+def test_group_init():
+    @command(one=1, two=2, three=3)
+    class cmd:
+        def __init__(self, one, two, three):
+            assert one == 1
+            assert two == 2
+            assert three == 3
+
+@pytest.mark.xfail
+def test_group_init_fail():
+    @command(one=3, two=2, three=1)
+    class cmd:
+        def __init__(self, one, two, three):
+            assert one == 1
+            assert two == 2
+            assert three == 3
+
+@pytest.mark.xfail
+def test_group_init_fail():
+    @command
+    class cmd:
+        def __init__(self, an_arg):
+            ...

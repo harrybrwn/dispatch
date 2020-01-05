@@ -2,7 +2,10 @@ import pytest, sys
 from os.path import dirname, realpath
 sys.path.insert(0, dirname(dirname(realpath(__file__))))
 
+import types
+
 from dispatch._meta import _FunctionMeta
+from dispatch.dispatch import Command
 
 class SomeClass:
     def cmd(self, hello: str, switch: bool, what='hello'):
@@ -61,8 +64,6 @@ def testFunctionMeta():
     assert len(m.defaults()) == 3
     assert m.defaults()['config'] == CFG_FILE
 
-import types
-
 def testClassFuncs():
     c = SomeClass()
     m = _FunctionMeta(c.cmd)
@@ -72,3 +73,13 @@ def testClassFuncs():
     m = _FunctionMeta(c.static_cmd)
     assert not isinstance(m.obj, types.MethodType)
 
+def test_multi_name_flag_docs():
+    def f(flag_name, another_flag):
+        '''this is a cli
+
+        :f flag-name: a flag's name
+        :a another_flag: another flag
+        '''
+    c = Command(f)
+    assert '-f, --flag-name' in c.helptext()
+    assert '-a, --another-flag' in c.helptext()
