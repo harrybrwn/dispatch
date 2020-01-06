@@ -225,7 +225,7 @@ class FlagSet:
             key = self._shorthands.pop(key)
         del self._flags[key]
 
-    def __contains__(self, key):
+    def __contains__(self, key) -> bool:
         return key in self._flags or key in self._shorthands
 
     def __iter__(self):

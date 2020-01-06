@@ -216,5 +216,17 @@ def test_group_init_fail():
 def test_group_init_fail_2():
     @command
     class cmd:
-        def __init__(self, an_arg):
-            ...
+        def __init__(self, an_arg): ...
+
+def test_hidden():
+    pytest.skip('bad command init')
+
+    @command(hidden={"hidden"})
+    class c:
+        hidden: bool
+    c.help()
+
+def test_function():
+    def func(arg, kwd=None):
+        ...
+    func(**{'arg': 'what', 'kwd': 5, 'another': 'what'})

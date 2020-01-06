@@ -13,10 +13,10 @@ pip install py-dispatch
 [docs.python]: # (grep -Pzo "[[?s]]# example\.py.*[[?=#end example\.py]]" example.py | tr -d '\0')
 ```python
 # example.py
-import dispatch
 import sys
+from dispatch import command
 
-@dispatch.command
+@command
 def hello(name: str, verbose: bool, debug: bool, file: str = 'stdout'):
     '''Run the 'hello' command line interface.
 
@@ -103,3 +103,51 @@ python cli.py --num=5+3j --decimal=5.9
 ```
 For this command, the parser internals will eventually call `complex('5+3j')` and `float('5.9')` before giving the values as function arguments.
 What this means is that you can use any type as long it has an `__init__` function that takes one argument. However there are exceptions
+
+Multiple Commands
+=================
+For more complicated command line interfaces, you need more than just flags. To do this you simply use the same `command` decorator on a class instead of a function.
+
+[docs.python]: # (cat multicommand.py)
+```python
+# multicommand.py
+from dispatch import command
+
+@command
+class multicommand:
+    verbose: bool = False
+
+    def cat(self, file: str):
+        '''Print a file
+
+        :f file: print this file'''
+        if self.verbose:
+            print('doing the thing verbosly')
+        print(open(file, 'r').read())
+
+    def do(self, thing):
+        '''Do a thing'''
+        print('doing', thing)
+
+if __name__ == "__main__":
+    multicommand()
+```
+
+This small program is used just like any other cli.
+```bash
+python multicommand.py --help
+```
+
+[docs]: # (python multicommand.py --help)
+```
+Usage:
+    multicommand [options] [command]
+
+Options:
+        --verbose    (default: False)
+    -h, --help      Get help.
+
+Commands:
+    cat Print a file
+    do  Do a thing
+```

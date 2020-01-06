@@ -14,5 +14,6 @@ __pycache__/
 
 # Misc.
 example.py
+multicommand.py
 TODO
 Makefile
