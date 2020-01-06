@@ -177,7 +177,7 @@ class FlagSet:
         docs = docs or dict()
         hidden_defaults = kwrgs.pop('hidden_defaults', set())
 
-        cmd_meta: Optional[_CliMeta] = kwrgs.get('__command_meta__')
+        cmd_meta: Optional[_CliMeta] = kwrgs.pop('__command_meta__')
         if cmd_meta:
             if not isinstance(cmd_meta, _CliMeta):
                 raise TypeError('__command_meta__ should inherit from _meta._CliMeta')
@@ -198,6 +198,8 @@ class FlagSet:
                 hide_default=name in hidden_defaults,
             )
             self[name] = opt
+        if kwrgs:
+            raise Exception('unrecognized keys ' + ', '.join(kwrgs.keys()))
 
     @property
     def format_len(self) -> int:

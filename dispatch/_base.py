@@ -1,15 +1,36 @@
+import sys
 import jinja2
 
+HELP_TMPL = '''{%- if main_doc -%}
+{{ main_doc }}
 
-class _BaseCommand:
+{% endif -%}
+Usage:
+    {{ usage }}
+
+Options:
+{%- for flg in flags %}
+    {{ '{}'.format(flg) }}
+{%- endfor -%}
+
+{% if command_help %}
+
+Commands:
+{{ command_help }}
+{%- endif %}
+'''
+
+
+class _CliBase:
 
     def __init__(self, **kwrgs):
-        pass
+        self.help_template = kwrgs.pop('help_template', HELP_TMPL)
+        self.doc_help = kwrgs.pop('doc_help', False)
 
-    def help(self):
-        print(self.helptext())
+    def help(self, file=sys.stdout):
+        print(self.helptext(), file=file)
 
-    def helptext(self):
+    def helptext(self, template=None):
         if self.doc_help:
             return self._meta.doc
 
@@ -23,7 +44,7 @@ class _BaseCommand:
         else:
             command_help = None
 
-        tmpl = jinja2.Template(self.help_template)
+        tmpl = jinja2.Template(template or self.help_template)
         return tmpl.render({
             'main_doc': self._help,
             'usage': self._usage,

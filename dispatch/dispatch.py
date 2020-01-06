@@ -4,33 +4,13 @@ from types import FunctionType, MethodType
 
 from .flags import FlagSet
 from ._meta import _FunctionMeta, _GroupMeta, _isgroup
-from ._base import _BaseCommand
+from ._base import _CliBase
 from .exceptions import UserException, DeveloperException, RequiredFlagError
 
 from typing import Optional, List, Generator, Callable, Any
 
 
-HELP_TMPL = '''{%- if main_doc -%}
-{{ main_doc }}
-
-{% endif -%}
-Usage:
-    {{ usage }}
-
-Options:
-{%- for flg in flags %}
-    {{ '{}'.format(flg) }}
-{%- endfor -%}
-
-{% if command_help %}
-
-Commands:
-{{ command_help }}
-{%- endif %}
-'''
-
-
-class Command(_BaseCommand):
+class Command(_CliBase):
 
     def __init__(self, callback: Callable, **kwrgs):
         # note: docs are modified at runtime
@@ -58,6 +38,8 @@ class Command(_BaseCommand):
                 command's flags are required.
             allow_null (bool):  If True (default is True), flags are allowed to be null
         '''
+        super().__init__(**kwrgs)
+
         self.callback = callback
         if not callable(self.callback):
             raise DeveloperException('Command callback needs to be callable')
@@ -68,10 +50,7 @@ class Command(_BaseCommand):
         )
         self._help = self._meta.helpstr
         self._usage = kwrgs.pop('usage', f'{self._meta.name} [options]')
-
         self._help = kwrgs.pop('help', self._help)
-        self.help_template = kwrgs.pop('help_template', HELP_TMPL)
-        self.doc_help = kwrgs.pop('doc_help', False)
         self.allow_null = kwrgs.pop('allow_null', True)
 
         self.args: List[str] = []
@@ -80,6 +59,8 @@ class Command(_BaseCommand):
             __command_meta__=self._meta,
             **kwrgs,
         )
+        if '__command_group__' in kwrgs:
+            self.group = kwrgs.pop('__command_group__')
 
     def __call__(self, argv=sys.argv):
         if argv is sys.argv:
@@ -177,7 +158,7 @@ def _find_commands(obj) -> Generator[tuple, None, None]:
             yield name, attr
 
 
-class Group(_BaseCommand):
+class Group(_CliBase):
     def __init__(self, obj, **kwrgs):
         '''
         Args:
@@ -189,8 +170,7 @@ class Group(_BaseCommand):
             doc_help:
             help:
         '''
-        self.help_template = kwrgs.pop('help_template', HELP_TMPL)
-        self.doc_help = kwrgs.pop('doc_help', False)
+        super().__init__(**kwrgs)
         self._usage = kwrgs.pop('usage', None)
 
         if isinstance(obj, type):
@@ -209,9 +189,11 @@ class Group(_BaseCommand):
 
         self._meta = _GroupMeta(self.inst)
         self._help = kwrgs.pop('help', self._meta.helpstr)
+        self._hidden = kwrgs.pop('hidden', set())
         self.flags = FlagSet(
             names=tuple(self._meta.flagnames()),
             __command_meta__=self._meta,
+            hidden=self._hidden,
             **kwrgs,
         )
 
@@ -324,20 +306,25 @@ class Group(_BaseCommand):
             setattr(self.inst, arg, val)
         return nextcmd
 
+    # TODO: hidden sub-commands should go here
+    # make a Sub-Command class that has a hidden attibute to make this cleaner
     def _command_help(self) -> Optional[str]:
         docs = []
+        keys = [k for k in self.commands.keys() if k not in self._hidden]
         try:
-            l = max(len(k) for k in self.commands.keys())
+            l = max(len(k) for k in keys)
         except ValueError:
             # max fails if there are no commands
             return None
 
         fmt = '\n'.join(
             f'    {k:<{l}} {"{}"}'
-            for k in self.commands.keys()
+            for k in keys
         )
 
-        for c in self.commands.values():
+        for name, c in self.commands.items():
+            if name in self._hidden:
+                continue
             if c.__doc__:
                 for line in c.__doc__.split('\n'):
                     if line:

@@ -210,12 +210,22 @@ def test_group_init_fail_2():
         def __init__(self, an_arg): ...
 
 def test_hidden():
-    # pytest.skip('bad command init')
+    settings = dict(
+        hidden={"hidden", 'subcommand'},
+        shorthands={'value': 'v'},
+        hidden_defaults={'value'},
+    )
 
-    @command(hidden={"hidden"})
+    @command(**settings)
     class c:
         hidden: bool
-    c.help()
+        value: str = 'secret_key'
+        def subcommand(self): ...
+    hlp = c.helptext()
+    assert '--hidden' not in hlp
+    assert 'secret_key' not in hlp
+    assert 'subcommand' not in hlp
+    assert '-v, --value' in hlp
 
 @pytest.mark.xfail
 def test_function():
