@@ -19,7 +19,7 @@ class _BaseCommand:
             f.f_len = fmt_len
 
         if hasattr(self, '_command_help'):
-            command_help = self._command_help
+            command_help = self._command_help()
         else:
             command_help = None
 

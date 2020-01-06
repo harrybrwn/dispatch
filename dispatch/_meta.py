@@ -167,7 +167,12 @@ class _GroupMeta(_CliMeta):
 
         # this is for any attributes that have been set inside
         # the object's init function.
-        for name, attr in self.obj.__dict__.items():
+        if hasattr(self.obj, '__dict__'):
+            attrs = self.obj.__dict__
+        else:
+            attrs = {}
+
+        for name, attr in attrs.items():
             if (
                 not name.startswith('_') and
                 not _isfunc(attr)

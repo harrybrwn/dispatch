@@ -10,11 +10,11 @@ from ._meta import _FunctionMeta, _GroupMeta, _CliMeta
 class Option:
 
     __slots__ = ('name', 'type', 'shorthand', 'help', '_value',
-                 'hidden', '_default', 'has_default', 'f_len')
+                 'hidden', '_default', 'has_default', 'f_len', 'hide_default')
 
     def __init__(self, name, typ, *,
                  shorthand: str = None, help: str = None, value=None,
-                 hidden=False, has_default=False):
+                 hidden=False, has_default=False, hide_default=False):
         self.name = name
         self.type = typ if typ is not None else bool
 
@@ -25,6 +25,7 @@ class Option:
         self.hidden = hidden
         self._default = value
         self.has_default = has_default or value is not None
+        self.hide_default = hide_default
         self.f_len = len(self.name)  # temp value, should be set later
 
         if self.shorthand == 'h' and self.name != 'help':
@@ -47,10 +48,12 @@ class Option:
         else:
             short = ' ' * 4
 
-        return '{0}{short}--{name:{1}}{help}'.format(
+        return '{0}{short}--{name:{1}}{help} {default}'.format(
             prefix, name_spec, short=short,
             name=self.name.replace('_', '-'),
-            help=self.help)
+            help=self.help,
+            default=self.show_default() if self.has_default else '',
+        )
 
     def __repr__(self):
         return "{}('{}', {})".format(
@@ -73,7 +76,7 @@ class Option:
             self.type = val.__class__
 
     def show_default(self) -> str:
-        if not self.has_default:
+        if not self.has_default or self.hide_default:
             return ''
         elif self.type is not bool and self.value:
             return f'(default: {self.value})'
@@ -163,6 +166,7 @@ class FlagSet:
                 {<shorthand>: <flagname>}.
             hidden: `set` of the flagnames that will be hidden from the help
                 text of the FlagSet.
+            hidden_defaults: `set` of flags that should not show their defauts
         '''
         self._flags: Dict[str, Option] = {}
         self._flagnames = names or ()
@@ -171,6 +175,7 @@ class FlagSet:
         types = types or dict()
         defaults = defaults or dict()
         docs = docs or dict()
+        hidden_defaults = kwrgs.pop('hidden_defaults', set())
 
         cmd_meta: Optional[_CliMeta] = kwrgs.get('__command_meta__')
         if cmd_meta:
@@ -190,6 +195,7 @@ class FlagSet:
                 help=docs.get(name, ''),
                 value=defaults.get(name),
                 hidden=name in hidden,
+                hide_default=name in hidden_defaults,
             )
             self[name] = opt
 

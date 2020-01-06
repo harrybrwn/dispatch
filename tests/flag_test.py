@@ -2,8 +2,8 @@ import pytest
 from pytest import raises
 
 import sys
-from os.path import dirname, realpath
-sys.path.insert(0, dirname(dirname(realpath(__file__))))
+from os.path import dirname
+sys.path.insert(0, dirname(dirname(__file__)))
 
 from typing import List, Set, Dict, Sequence, Mapping
 

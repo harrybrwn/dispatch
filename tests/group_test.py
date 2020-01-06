@@ -2,8 +2,8 @@ import pytest
 from pytest import raises
 
 import sys
-from os.path import dirname, realpath
-sys.path.insert(0, dirname(dirname(realpath(__file__))))
+from os.path import dirname
+sys.path.insert(0, dirname(dirname(__file__)))
 
 from dispatch import command, Group, Command, UserException
 from dispatch.dispatch import _find_commands
@@ -196,18 +196,9 @@ def test_bool_parse():
         C(['--verbose=True'])
 
 def test_group_init():
-    @command(one=1, two=2, three=3)
+    @command(**{'init': dict(one=1, two=2, three=3)})
     class cmd:
-        def __init__(self, one, two, three):
-            assert one == 1
-            assert two == 2
-            assert three == 3
-
-@pytest.mark.xfail
-def test_group_init_fail():
-    @command(one=3, two=2, three=1)
-    class cmd:
-        def __init__(self, one, two, three):
+        def __init__(self, *, one: int, two: int, three: int):
             assert one == 1
             assert two == 2
             assert three == 3
@@ -219,13 +210,14 @@ def test_group_init_fail_2():
         def __init__(self, an_arg): ...
 
 def test_hidden():
-    pytest.skip('bad command init')
+    # pytest.skip('bad command init')
 
     @command(hidden={"hidden"})
     class c:
         hidden: bool
     c.help()
 
+@pytest.mark.xfail
 def test_function():
     def func(arg, kwd=None):
         ...

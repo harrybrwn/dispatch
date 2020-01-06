@@ -20,13 +20,12 @@ Usage:
 Options:
 {%- for flg in flags %}
     {{ '{}'.format(flg) }}
-    {%- if flg.has_default %} {{ flg.show_default() }}{% endif %}
 {%- endfor -%}
 
 {% if command_help %}
 
 Commands:
-{{ command_help() }}
+{{ command_help }}
 {%- endif %}
 '''
 
@@ -179,7 +178,7 @@ def _find_commands(obj) -> Generator[tuple, None, None]:
 
 
 class Group(_BaseCommand):
-    def __init__(self, obj, *args, **kwrgs):
+    def __init__(self, obj, **kwrgs):
         '''
         Args:
             obj: a class that will be used as the command groups
@@ -195,7 +194,8 @@ class Group(_BaseCommand):
         self._usage = kwrgs.pop('usage', None)
 
         if isinstance(obj, type):
-            self.inst = obj(*args, **kwrgs) # TODO: find a way to make this safer
+            init = kwrgs.pop('init', dict())
+            self.inst = obj(**init) # TODO: find a way to make this safer
             self.type = obj
         else:
             ...
@@ -236,8 +236,15 @@ class Group(_BaseCommand):
     def __call__(self, argv: List[str] = sys.argv):
         if argv is sys.argv:
             argv = argv[1:]
-        if argv and (argv[0] == '--help' or argv[0] == '-h'):
-            return self.help()
+        if argv:
+            if 'help' in argv[0]:
+                if argv[1:] and self.iscommand(argv[1]):
+                    return self._get_command(argv[1]).help()
+                else:
+                    return self.help()
+            elif argv[0] == '-h':
+                return self.help()
+
         cmd = self.parse_args(argv)
 
         # if the command is callable and no arguments are given,
@@ -317,13 +324,18 @@ class Group(_BaseCommand):
             setattr(self.inst, arg, val)
         return nextcmd
 
-    def _command_help(self) -> str:
+    def _command_help(self) -> Optional[str]:
         docs = []
-        l = max([len(k) for k in self.commands.keys()])
-        fmt = '\n'.join([
+        try:
+            l = max(len(k) for k in self.commands.keys())
+        except ValueError:
+            # max fails if there are no commands
+            return None
+
+        fmt = '\n'.join(
             f'    {k:<{l}} {"{}"}'
             for k in self.commands.keys()
-        ])
+        )
 
         for c in self.commands.values():
             if c.__doc__:
@@ -340,10 +352,10 @@ def helptext(fn) -> str:
     return Command(fn).helptext()
 
 
-def command(_obj=None, *args, **kwrgs):
+def command(_obj=None, **kwrgs):
     def cmd(obj):
         if _isgroup(obj):
-            return Group(obj, *args, **kwrgs)
+            return Group(obj, **kwrgs)
         return Command(obj, **kwrgs)
 
     # command is being called with parens as @command(...)
