@@ -220,11 +220,13 @@ def test_hidden():
         hidden: bool
         value: str = 'secret_key'
         def sub_command(self): ...
-        def go_do_it(self): ...
+        def go_do_it(self):
+            assert self.hidden
 
         @subcommand(hidden=True)
         def hidden_command(self, flagval=False):
             assert flagval
+            assert self.hidden
 
     hlp = c.helptext()
 
@@ -233,11 +235,23 @@ def test_hidden():
     assert '-v, --value' in hlp
     assert 'sub_command' not in hlp
     assert 'hidden_command' not in hlp
-    c(['hidden_command', '--flagval'])
+    c(['hidden_command', '--flagval', '--hidden'])
+    assert c.inst.hidden
+    c._reset()
+    assert not c.inst.hidden
+    c(['--hidden', 'go-do-it'])
+    c._reset()
+    c(['go-do-it', '--hidden'])
+    c._reset()
     for f in c.inst.hidden_command.flags.values():
         f._reset()
     with raises(AssertionError):
-        c(['hidden_command'])
+        c(['hidden_command', '--hidden'])
+    c._reset()
+    for f in c.inst.hidden_command.flags.values():
+        f._reset()
+    with raises(AssertionError):
+        c(['hidden_command', '--flagval'])
 
 
 @pytest.mark.xfail

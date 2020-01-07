@@ -170,6 +170,16 @@ def _find_commands(obj) -> Generator[tuple, None, None]:
 # TODO:
 #   - make command aliases work
 class SubCommand(Command):
+    '''
+    SubCommands are meant to be added to a command group with the 'subcommand'
+    decorator. This is a way to specify extra features for a command and
+    is NOT NECCESARY for the creation of an actual subcommand. Adding the
+    'subcommand' decorator to all of the subcommands will hinder preformance
+    slightly.
+
+    The second purpose of this class is for Group's internal sub-command use.
+    '''
+
     def __init__(self, callback, hidden=False, **kwrgs):
         self.group = kwrgs.pop('__command_group__', None)
         super().__init__(callback, **kwrgs)
@@ -279,13 +289,14 @@ class Group(_CliBase):
             setattr(self.inst, f.name, f._getnull())
 
     def iscommand(self, name: str) -> bool:
+        name = name.replace('-', '_')
         return (
             not name.startswith('_') and
             name in self.commands
         )
 
     def _get_command(self, name: str) -> SubCommand:
-        fn = self.commands[name]
+        fn = self.commands[name.replace('-', '_')]
 
         if isinstance(fn, SubCommand):
             fn._meta.set_instance(self.inst)
