@@ -198,8 +198,6 @@ class FlagSet:
                 hide_default=name in hidden_defaults,
             )
             self[name] = opt
-        if kwrgs:
-            raise Exception('unrecognized keys ' + ', '.join(kwrgs.keys()))
 
     @property
     def format_len(self) -> int:

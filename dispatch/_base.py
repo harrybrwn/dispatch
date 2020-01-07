@@ -47,7 +47,7 @@ class _CliBase:
         tmpl = jinja2.Template(template or self.help_template)
         return tmpl.render({
             'main_doc': self._help,
-            'usage': self._usage,
+            'usage': self.usage,
             'flags': flags,
             'command_help': command_help,
         })

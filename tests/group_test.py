@@ -5,8 +5,8 @@ import sys
 from os.path import dirname
 sys.path.insert(0, dirname(dirname(__file__)))
 
-from dispatch import command, Group, Command, UserException
-from dispatch.dispatch import _find_commands
+from dispatch import command, subcommand, Group, Command, UserException
+from dispatch.dispatch import _find_commands, SubCommand
 from dispatch._meta import _isgroup, _isfunc, _GroupMeta
 
 
@@ -211,21 +211,34 @@ def test_group_init_fail_2():
 
 def test_hidden():
     settings = dict(
-        hidden={"hidden", 'subcommand'},
+        hidden={"hidden", 'sub_command'},
         shorthands={'value': 'v'},
         hidden_defaults={'value'},
     )
-
     @command(**settings)
     class c:
         hidden: bool
         value: str = 'secret_key'
-        def subcommand(self): ...
+        def sub_command(self): ...
+        def go_do_it(self): ...
+
+        @subcommand(hidden=True)
+        def hidden_command(self, flagval=False):
+            assert flagval
+
     hlp = c.helptext()
+
     assert '--hidden' not in hlp
     assert 'secret_key' not in hlp
-    assert 'subcommand' not in hlp
     assert '-v, --value' in hlp
+    assert 'sub_command' not in hlp
+    assert 'hidden_command' not in hlp
+    c(['hidden_command', '--flagval'])
+    for f in c.inst.hidden_command.flags.values():
+        f._reset()
+    with raises(AssertionError):
+        c(['hidden_command'])
+
 
 @pytest.mark.xfail
 def test_function():

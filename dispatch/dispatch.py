@@ -59,8 +59,18 @@ class Command(_CliBase):
             __command_meta__=self._meta,
             **kwrgs,
         )
-        if '__command_group__' in kwrgs:
-            self.group = kwrgs.pop('__command_group__')
+
+    @property
+    def usage(self):
+        return self._usage
+
+    @property
+    def name(self):
+        return self._meta.name
+
+    @name.setter
+    def name(self, newname):
+        self._meta.name = newname
 
     def __call__(self, argv=sys.argv):
         if argv is sys.argv:
@@ -69,7 +79,6 @@ class Command(_CliBase):
             return self.help()
 
         fn_args = self.parse_args(argv)
-
         if self._meta.has_variadic_param():
             return self._meta.run(*self.args, **fn_args)
         return self._meta.run(**fn_args)
@@ -151,11 +160,26 @@ def _find_commands(obj) -> Generator[tuple, None, None]:
             not name.startswith('_') and
             isinstance(attr, (
                 FunctionType,
-                MethodType
+                MethodType,
+                _CliBase,
             ))
         )
         if ok:
             yield name, attr
+
+# TODO:
+#   - make command aliases work
+class SubCommand(Command):
+    def __init__(self, callback, hidden=False, **kwrgs):
+        self.group = kwrgs.pop('__command_group__', None)
+        super().__init__(callback, **kwrgs)
+        self.hidden = hidden
+
+    @property
+    def usage(self):
+        if self.group is None:
+            return self._usage
+        return f'{self.group.name} {self._meta.name} [options]'
 
 
 class Group(_CliBase):
@@ -185,11 +209,15 @@ class Group(_CliBase):
         self.args = []
         self.name = self.type.__name__
         self._usage = self._usage or f'{self.name} [options] [command]'
+
         self.commands = dict(_find_commands(self.type))
+        self._hidden = kwrgs.pop('hidden', set())
+        for c in self.commands.values():
+            if isinstance(c, SubCommand) and c.hidden:
+                self._hidden.add(c.name)
 
         self._meta = _GroupMeta(self.inst)
         self._help = kwrgs.pop('help', self._meta.helpstr)
-        self._hidden = kwrgs.pop('hidden', set())
         self.flags = FlagSet(
             names=tuple(self._meta.flagnames()),
             __command_meta__=self._meta,
@@ -214,6 +242,10 @@ class Group(_CliBase):
 
         self.type.__getattr__ = new_getattr
         self.type.__setattr__ = new_setattr
+
+    @property
+    def usage(self):
+        return self._usage
 
     def __call__(self, argv: List[str] = sys.argv):
         if argv is sys.argv:
@@ -247,17 +279,21 @@ class Group(_CliBase):
             setattr(self.inst, f.name, f._getnull())
 
     def iscommand(self, name: str) -> bool:
-        return not name.startswith('_') and name in self.commands
+        return (
+            not name.startswith('_') and
+            name in self.commands
+        )
 
-    def _get_command(self, name: str) -> Command:
+    def _get_command(self, name: str) -> SubCommand:
         fn = self.commands[name]
 
-        if isinstance(fn, Command):
-            fn._meta.add_instance(self.inst)
+        if isinstance(fn, SubCommand):
+            fn._meta.set_instance(self.inst)
+            fn.group = self
             return fn
-        return Command(fn, __instance__=self.inst, __command_group__=self)
+        return SubCommand(fn, __instance__=self.inst, __command_group__=self)
 
-    def parse_args(self, args: List[str]) -> Optional[Command]:
+    def parse_args(self, args: List[str]) -> Optional[SubCommand]:
         # TODO: use the Flag.setval in addition to this method of saving
         # the variable.
         nextcmd = None
@@ -350,6 +386,16 @@ def command(_obj=None, **kwrgs):
         return cmd
     # being called without parens as @command
     return cmd(_obj)
+
+
+def subcommand(_obj=None, **kwrgs):
+    def subcmd(obj):
+        return SubCommand(obj, **kwrgs)
+
+    if _obj is None:
+        return subcmd
+
+    return subcmd(_obj)
 
 
 def handle(fn):

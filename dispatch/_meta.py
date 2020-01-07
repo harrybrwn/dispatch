@@ -7,6 +7,7 @@ from types import FunctionType, MethodType
 from typing import Dict, Set, Any
 
 from .exceptions import UserException
+from ._base import _CliBase
 
 
 class _CliMeta(ABC):
@@ -83,7 +84,13 @@ class _FunctionMeta(_CliMeta):
         self.instance = instance
         self.helpstr, self.flagdocs = self._parse_doc(self.doc)
 
-        if self.instance or isinstance(self.obj, MethodType):
+        fn_params = self.signature.parameters
+        if (
+            self.instance or
+            isinstance(self.obj, MethodType) or
+            fn_params.get('self') is not None or
+            fn_params.get('cls') is not None
+        ):
             self.needs_self = True
         else:
             self.needs_self = False
@@ -135,7 +142,7 @@ class _FunctionMeta(_CliMeta):
                 return name, typ
         return '', None
 
-    def add_instance(self, inst):
+    def set_instance(self, inst):
         self.instance = inst
         self.needs_self = True
 
@@ -177,15 +184,17 @@ class _GroupMeta(_CliMeta):
                 not name.startswith('_') and
                 not _isfunc(attr)
             ):
-                self._defaults[name] = attr
                 self._annotations[name] = type(attr)
+                self._defaults[name] = attr
 
         attrs = self.obj.__class__.__dict__
 
         for name, attr in attrs.items():
-            if (
-                not name.startswith('_') and
+            if name.startswith('_'):
+                continue
+            elif (
                 not _isfunc(attr) and
+                not isinstance(attr, _CliBase) and
                 attr != type.mro
             ):
                 self._annotations[name] = type(attr)
