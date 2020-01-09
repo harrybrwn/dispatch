@@ -61,7 +61,7 @@ def _parse_flags_doc(doc: str):
         if len(names) == 2:
             res[names[1].replace('-', '_')] = {'doc': tmpdoc, 'shorthand': names[0]}
         else:
-            res[names[0]] = {'doc': tmpdoc, 'shorthand': None}
+            res[names[0].replace('-', '_')] = {'doc': tmpdoc, 'shorthand': None}
     return res
 
 

@@ -245,8 +245,8 @@ def testHelp():
         'that has a multi-line description.\n',
         '-f, --file',    'Give the cli a file',
         '-v, --verbose', 'Print out all the information to stdout',
-        '--time',        'Use some other time (default: local)',
-        '-o, --output',  'Give the program an output file (default: stdout)',
+        '--time',        'Use some other time (default: \'local\')',
+        '-o, --output',  'Give the program an output file (default: \'stdout\')',
         '-h, --help',
     ]
     for t in tc:

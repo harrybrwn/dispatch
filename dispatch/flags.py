@@ -79,9 +79,9 @@ class Option:
         if not self.has_default or self.hide_default:
             return ''
         elif self.type is not bool and self.value:
-            return f'(default: {self.value})'
+            return f'(default: {self.value!r})'
         elif self.type is bool:
-            return f'(default: {self.value})'
+            return f'(default: {self.value!r})'
         return ''
 
     def setval(self, val):

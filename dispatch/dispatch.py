@@ -1,4 +1,4 @@
-import sys
+import sys, os
 import inspect
 from types import FunctionType, MethodType
 
@@ -372,7 +372,9 @@ class Group(_CliBase):
         for name, c in self.commands.items():
             if name in self._hidden:
                 continue
-            if c.__doc__:
+            if isinstance(c, SubCommand):
+                docs.append(c._meta.helpstr)
+            elif c.__doc__:
                 for line in c.__doc__.split('\n'):
                     if line:
                         docs.append(line.strip())

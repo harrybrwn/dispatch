@@ -221,6 +221,7 @@ def test_hidden():
         value: str = 'secret_key'
         def sub_command(self): ...
         def go_do_it(self):
+            '''go do that thing'''
             assert self.hidden
 
         @subcommand(hidden=True)
@@ -259,3 +260,19 @@ def test_function():
     def func(arg, kwd=None):
         ...
     func(**{'arg': 'what', 'kwd': 5, 'another': 'what'})
+
+
+def test_subcommand():
+    @command
+    class cmd:
+        @subcommand
+        def inner(self):
+            '''hello'''
+            ...
+        @subcommand
+        def func(self):
+            '''i am a func'''
+            ...
+    hlp = cmd.helptext()
+    print(hlp)
+    assert SubCommand.__doc__[:15].strip() not in hlp
