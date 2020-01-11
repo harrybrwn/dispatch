@@ -5,7 +5,10 @@ from types import FunctionType, MethodType
 from .flags import FlagSet
 from ._meta import _FunctionMeta, _GroupMeta, _isgroup
 from ._base import _CliBase
-from .exceptions import UserException, DeveloperException, RequiredFlagError
+from .exceptions import (
+    UserException, DeveloperException,
+    RequiredFlagError, BadFlagError
+)
 
 from typing import Optional, List, Generator, Callable, Any
 
@@ -36,7 +39,6 @@ class Command(_CliBase):
             help_template (str): template used for the help text
                 to have a value of None. This would mean that none of the
                 command's flags are required.
-            allow_null (bool):  If True (default is True), flags are allowed to be null
         '''
         super().__init__(**kwrgs)
 
@@ -51,7 +53,6 @@ class Command(_CliBase):
         self._help = self._meta.helpstr
         self._usage = kwrgs.pop('usage', f'{self._meta.name} [options]')
         self._help = kwrgs.pop('help', self._help)
-        self.allow_null = kwrgs.pop('allow_null', True)
 
         self.args: List[str] = []
         self.flags = FlagSet(
@@ -79,9 +80,12 @@ class Command(_CliBase):
             return self.help()
 
         fn_args = self.parse_args(argv)
+
         if self._meta.has_variadic_param():
             return self._meta.run(*self.args, **fn_args)
-        return self._meta.run(**fn_args)
+        res = self._meta.run(**fn_args)
+        if res is not None:
+            print(res)
 
     def __repr__(self):
         return f'{self.__class__.__name__}({self._meta.name}{self._meta.signature})'
@@ -131,28 +135,10 @@ class Command(_CliBase):
                     flag.value = not flag._default
                 else:
                     flag.value = True if flag.value is None else flag.value
-
-        if self.allow_null:
-            return {n: f.value for n, f in self.flags.items()}
-        return self._null_check_flag_args()
+        return {n: f.value for n, f in self.flags.items()}
 
     def run(self, argv=sys.argv):
         return self.__call__(argv)
-
-    def _null_check_flag_args(self) -> dict:
-        values = {}
-        for name, flag in self.flags.items():
-            # all flags should have a value at this point
-            # if not, booleans are false all else raises an error
-            if not flag.has_default and flag.value is None:
-                if flag.type is bool:
-                    flag.value = False
-                else:
-                    raise RequiredFlagError(
-                        f"'--{flag.name}' is a required flag")
-            values[name] = flag.value
-        return values
-
 
 def _find_commands(obj) -> Generator[tuple, None, None]:
     for name, attr in obj.__dict__.items():
@@ -218,7 +204,6 @@ class Group(_CliBase):
 
         self.args = []
         self.name = self.type.__name__
-        self._usage = self._usage or f'{self.name} [options] [command]'
 
         self.commands = dict(_find_commands(self.type))
         self._hidden = kwrgs.pop('hidden', set())
@@ -255,7 +240,7 @@ class Group(_CliBase):
 
     @property
     def usage(self):
-        return self._usage
+        return self._usage or f'{self.name} [options] [command]'
 
     def __call__(self, argv: List[str] = sys.argv):
         if argv is sys.argv:
@@ -332,7 +317,7 @@ class Group(_CliBase):
                     # if we have not found a sub-command yet then the unkown
                     # flag should not be passed on to any other commands we
                     # should throw and error for an unknown flag
-                    raise UserException(f'{arg!r} is not a flag')
+                    raise BadFlagError(f'{arg!r} is not a flag')
                 # if the flag is not in the group, then it might be
                 # for the next command (self.args is passed the the next
                 # command).
@@ -343,12 +328,12 @@ class Group(_CliBase):
             elif flag.type is not bool:
                 if val is None:
                     if not args or args[0].startswith('-'):
-                        raise UserException(f'{arg!r} must be given a value.')
+                        raise UserException(f'{raw_arg!r} must be given a value.')
                     val = args.pop(0)
             else:
                 # catch the case where '=' has been used
                 if val is not None:
-                    raise UserException(f'{arg!r} should not be given a value.')
+                    raise UserException(f'{raw_arg!r} should not be given a value.')
                 val = True
             setattr(self.inst, arg, val)
         return nextcmd

@@ -31,6 +31,9 @@ def test_Command():
     assert cmd.flags['arg2'].name == 'arg2'
     assert cmd.flags['arg1'].type is bool
     assert cmd.flags['arg1'].type is bool
+    assert cmd.name == 'fn'
+    cmd.name = 'not_fn'
+    assert cmd.name == 'not_fn'
 
     def fn(): pass
     cmd = Command(fn)
@@ -163,15 +166,11 @@ def test_run_Command():
         :n name: give the program a name
         '''
         assert name == 'joe'
-        return len(fn2.flags)
-    r = fn2(['--name', 'joe'])
-    assert r == 1
-    r = fn2(['-n', 'joe'])
-    assert r == 1
-    r = fn2(['--name=joe'])
-    assert r == 1
-    r = fn2(['-n=joe'])
-    assert r == 1
+        assert len(fn2.flags) == 1
+    fn2(['--name', 'joe'])
+    fn2(['-n', 'joe'])
+    fn2(['--name=joe'])
+    fn2(['-n=joe'])
 
     @command()
     def fn3(multi_word_flag, bool_flag: bool):
@@ -179,7 +178,14 @@ def test_run_Command():
         assert not bool_flag
     fn3(['--multi-word-flag'])  # pylint: disable=no-value-for-parameter
 
-def test_command_settings():
+def test_parseargs_err():
+    @command
+    def fn(flag1, flag2):
+        ...
+    with raises(UserException):
+        fn(['--flag3'])
+
+def test_command_settings(capsys):
     @command(
         hidden={'debug', 'verbose'},
         defaults={'debug': False})
@@ -191,17 +197,17 @@ def test_command_settings():
         assert verbose
         assert not debug
         return 76
-    val = f1(['-v'])  # pylint: disable=no-value-for-parameter
-    assert val == 76
-    assert str(f1) == f1.helptext()
+    f1(['-v'])  # pylint: disable=no-value-for-parameter
+    assert 'debug' not in f1.helptext()
+    assert 'verbose' not in f1.helptext()
+    out, err = capsys.readouterr()
+    assert out == '76\n'
 
     @command(shorthands={'debug': 'd'},
              help="f2 is a test command")
     def f2(debug: bool = False):
         assert debug
-        return 'what???'
-    val = f2(['-d'])
-    assert val == 'what???'
+    f2(['-d'])
     assert 'f2 is a test command' in f2.helptext()
     assert str(f2) == f2.helptext()
 

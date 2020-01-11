@@ -8,3 +8,7 @@ class RequiredFlagError(UserException):
 
 class DeveloperException(Exception):
     pass
+
+
+class BadFlagError(UserException):
+    pass

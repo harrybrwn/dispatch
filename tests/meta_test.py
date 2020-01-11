@@ -4,7 +4,7 @@ sys.path.insert(0, dirname(dirname(__file__)))
 
 import types
 
-from dispatch._meta import _FunctionMeta
+from dispatch._meta import _FunctionMeta, _CliMeta
 from dispatch.dispatch import Command
 
 class SomeClass:

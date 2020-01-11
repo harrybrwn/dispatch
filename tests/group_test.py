@@ -7,6 +7,7 @@ sys.path.insert(0, dirname(dirname(__file__)))
 
 from dispatch import command, subcommand, Group, Command, UserException
 from dispatch.dispatch import _find_commands, SubCommand
+from dispatch.exceptions import BadFlagError
 from dispatch._meta import _isgroup, _isfunc, _GroupMeta
 
 
@@ -254,6 +255,31 @@ def test_hidden():
     with raises(AssertionError):
         c(['hidden_command', '--flagval'])
 
+def test_group_parseargs():
+    @command
+    class cmd:
+        def __call__(self):
+            assert cmd.args == ['one', 'two']
+    cmd(['one', 'two'])
+    assert cmd.args == ['one', 'two']
+    cmd._reset()
+    assert cmd.args == []
+
+def test_group_err():
+    sysexit = sys.exit
+    def f(a): ...
+    sys.exit = f
+    @command
+    class cmd:
+        verbose: bool
+
+    with raises(TypeError):
+        cmd([])
+    sys.exit = sysexit
+    hlp = cmd.helptext()
+    assert 'Commands:' not in hlp
+    with raises(BadFlagError, match="'notaflag' is not a flag"):
+        cmd(['--notaflag'])
 
 @pytest.mark.xfail
 def test_function():
@@ -274,5 +300,4 @@ def test_subcommand():
             '''i am a func'''
             ...
     hlp = cmd.helptext()
-    print(hlp)
     assert SubCommand.__doc__[:15].strip() not in hlp
