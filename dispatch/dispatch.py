@@ -82,10 +82,13 @@ class Command(_CliBase):
         fn_args = self.parse_args(argv)
 
         if self._meta.has_variadic_param():
-            return self._meta.run(*self.args, **fn_args)
-        res = self._meta.run(**fn_args)
+            res = self._meta.run(*self.args, **fn_args)
+        else:
+            res = self._meta.run(**fn_args)
+
         if res is not None:
             print(res)
+        return res
 
     def __repr__(self):
         return f'{self.__class__.__name__}({self._meta.name}{self._meta.signature})'
