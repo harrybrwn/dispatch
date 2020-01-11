@@ -377,6 +377,27 @@ def helptext(fn) -> str:
 
 
 def command(_obj=None, **kwrgs):
+    '''A decorator for creating commands
+
+    Keyword Args:
+        usage (str): Give the command a custom usage line.
+        shorthands (dict): Give the command flags a shorthand use
+            {<flag name>: <shorthand>}, has greater precedence over doc
+            parsing.
+        docs (dict): Give the command flags a doc string use
+            {<flag name>: <help text>} has greater precedence over doc
+            parsing.
+        defaults (dict): Give the command flags a default value use
+            {<flag name>: <value>} has greater precedence over doc parsing.
+        hidden (set):  The set of flag names that should be hidden.
+
+        help: (str):        Command's main description.
+        doc_help (bool): If True (default is False), use the callback
+            __doc__ as the help text for this command.
+        help_template (str): template used for the help text
+            to have a value of None. This would mean that none of the
+            command's flags are required.
+    '''
     def cmd(obj):
         if _isgroup(obj):
             return Group(obj, **kwrgs)
@@ -390,6 +411,11 @@ def command(_obj=None, **kwrgs):
 
 
 def subcommand(_obj=None, **kwrgs):
+    '''A decorator for sub-commands of a command group
+
+    Keyword Args:
+        hidden `bool`: will hide the entire command if set to True
+    '''
     def subcmd(obj):
         return SubCommand(obj, **kwrgs)
 
