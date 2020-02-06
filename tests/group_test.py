@@ -2,6 +2,7 @@ import pytest
 from pytest import raises
 
 import sys
+import os
 from os.path import dirname
 sys.path.insert(0, dirname(dirname(__file__)))
 
@@ -265,16 +266,18 @@ def test_group_parseargs():
     cmd._reset()
     assert cmd.args == []
 
-def test_group_err():
-    sysexit = sys.exit
+def test_group_err(capsys):
     def f(a): ...
+
+    sysexit = sys.exit
     sys.exit = f
     @command
     class cmd:
         verbose: bool
 
-    with raises(TypeError):
-        cmd([])
+    # with raises(TypeError):
+    #     cmd([])
+
     sys.exit = sysexit
     hlp = cmd.helptext()
     assert 'Commands:' not in hlp
@@ -301,3 +304,15 @@ def test_subcommand():
             ...
     hlp = cmd.helptext()
     assert SubCommand.__doc__[:15].strip() not in hlp
+
+def test_command_aliases():
+    @command
+    class cmd:
+        def inner(self):
+            '''hello'''
+        def func(self):
+            '''i am a func'''
+        function = func
+
+    hlp = cmd.helptext()
+    print(hlp)

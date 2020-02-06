@@ -345,7 +345,12 @@ class Group(_CliBase):
     # make a Sub-Command class that has a hidden attibute to make this cleaner
     def _command_help(self) -> Optional[str]:
         docs = []
-        keys = [k for k in self.commands.keys() if k not in self._hidden]
+        keys = [
+            k.replace('_', '-')
+            for k in self.commands.keys()
+            if k not in self._hidden
+        ]
+
         try:
             l = max(len(k) for k in keys)
         except ValueError:
