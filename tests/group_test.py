@@ -314,17 +314,10 @@ def test_command_aliases():
             '''i am a func'''
         function = func
 
-    from dispatch.dispatch import _retrieve_commands
-
+    itms = [
+        'func, function',
+        'i am a func'
+    ]
     hlp = cmd.helptext()
-    print(hlp)
-    # print(cmd.commands)
-
-    # print(dir(cmd))
-    # print(cmd._meta.obj)
-    # print(cmd._meta.obj.__dict__)
-
-    c, a = _retrieve_commands(cmd)
-    print(c)
-    print(a)
-
+    for i in itms:
+        assert i in hlp

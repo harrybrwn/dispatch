@@ -143,19 +143,6 @@ class Command(_CliBase):
     def run(self, argv=sys.argv):
         return self.__call__(argv)
 
-def _find_commands(obj) -> Generator[tuple, None, None]:
-    for name, attr in obj.__dict__.items():
-        ok = (
-            not name.startswith('_') and
-            isinstance(attr, (
-                FunctionType,
-                MethodType,
-                _CliBase,
-            ))
-        )
-        if ok:
-            yield name, attr
-
 def _retrieve_commands(obj):
     cmds = {}
     seen = set()
@@ -171,7 +158,6 @@ def _retrieve_commands(obj):
         )
         if ok:
             if attr in seen:
-                # aliases[name] = attr.__name__
                 if isinstance(attr, _CliBase):
                     aliases[attr.name] = name
                 else:
