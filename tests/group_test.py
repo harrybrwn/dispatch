@@ -102,9 +102,9 @@ def testArgParsing():
 
     tests = [
         'CMD', '--verbose', '--filename',
-        'cmd   Sub command of CMD',
-        'other Sub command of the CMD command',
-        'hello Sub-command of CMD',
+        'cmd     Sub command of CMD',
+        'other   Sub command of the CMD command',
+        'hello   Sub-command of CMD',
     ]
     for t in tests:
         assert t in helptxt
@@ -314,5 +314,17 @@ def test_command_aliases():
             '''i am a func'''
         function = func
 
+    from dispatch.dispatch import _retrieve_commands
+
     hlp = cmd.helptext()
     print(hlp)
+    # print(cmd.commands)
+
+    # print(dir(cmd))
+    # print(cmd._meta.obj)
+    # print(cmd._meta.obj.__dict__)
+
+    c, a = _retrieve_commands(cmd)
+    print(c)
+    print(a)
+

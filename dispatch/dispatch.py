@@ -156,8 +156,32 @@ def _find_commands(obj) -> Generator[tuple, None, None]:
         if ok:
             yield name, attr
 
-# TODO:
-#   - make command aliases work
+def _retrieve_commands(obj):
+    cmds = {}
+    seen = set()
+    aliases = {}
+    for name, attr in obj.__dict__.items():
+        ok = (
+            not name.startswith('_') and
+            isinstance(attr, (
+                FunctionType,
+                MethodType,
+                _CliBase,
+            ))
+        )
+        if ok:
+            if attr in seen:
+                # aliases[name] = attr.__name__
+                if isinstance(attr, _CliBase):
+                    aliases[attr.name] = name
+                else:
+                    aliases[attr.__name__] = name
+            else:
+                seen.add(attr)
+                cmds[name] = attr
+    return cmds, aliases
+
+
 class SubCommand(Command):
     '''
     SubCommands are meant to be added to a command group with the 'subcommand'
@@ -208,7 +232,9 @@ class Group(_CliBase):
         self.args = []
         self.name = self.type.__name__
 
-        self.commands = dict(_find_commands(self.type))
+        # self.commands = dict(_find_commands(self.type))
+        self.commands, self.aliases = _retrieve_commands(self.type)
+
         self._hidden = kwrgs.pop('hidden', set())
         for c in self.commands.values():
             if isinstance(c, SubCommand) and c.hidden:
@@ -345,11 +371,13 @@ class Group(_CliBase):
     # make a Sub-Command class that has a hidden attibute to make this cleaner
     def _command_help(self) -> Optional[str]:
         docs = []
-        keys = [
-            k.replace('_', '-')
-            for k in self.commands.keys()
-            if k not in self._hidden
-        ]
+        keys = []
+        for k in self.commands.keys():
+            if k in self._hidden:
+                continue
+            if k in self.aliases:
+                k += f', {self.aliases[k]}'
+            keys.append(k)
 
         try:
             l = max(len(k) for k in keys)
@@ -358,7 +386,7 @@ class Group(_CliBase):
             return None
 
         fmt = '\n'.join(
-            f'    {k:<{l}} {"{}"}'
+            f'    {k:<{l}}   {"{}"}'
             for k in keys
         )
 
