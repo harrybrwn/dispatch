@@ -7,7 +7,7 @@ from os.path import dirname
 sys.path.insert(0, dirname(dirname(__file__)))
 
 from dispatch import command, subcommand, Group, Command, UserException
-from dispatch.dispatch import _find_commands, SubCommand
+from dispatch.dispatch import SubCommand
 from dispatch.exceptions import BadFlagError
 from dispatch._meta import _isgroup, _isfunc, _GroupMeta
 
@@ -117,7 +117,6 @@ def testFindCommands():
         def __call__(self): ...
         def one(self, value): ...
         def two(self): ...
-    assert set(dict(_find_commands(cmd)).keys()) == {'one', 'two'}
     assert _isgroup(cmd)
 
 
@@ -321,3 +320,23 @@ def test_command_aliases():
     hlp = cmd.helptext()
     for i in itms:
         assert i in hlp
+
+def test_static_subcommands():
+    @command
+    class cmd:
+        @staticmethod
+        def inner(a_flag: str):
+            '''hello'''
+            assert a_flag == 'yes'
+
+        # @staticmethod
+        def func(self, yes):
+            '''i am a func'''
+            assert yes
+        function = func
+
+    cmd(['inner', '--a-flag', 'yes'])
+    cmd._reset()
+    cmd(['function', '--yes'])
+    cmd._reset()
+    cmd(['func', '--yes'])

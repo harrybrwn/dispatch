@@ -12,3 +12,6 @@ class DeveloperException(Exception):
 
 class BadFlagError(UserException):
     pass
+
+class CommandNotFound(UserException):
+    pass

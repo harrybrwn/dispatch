@@ -7,7 +7,8 @@ from ._meta import _FunctionMeta, _GroupMeta, _isgroup
 from ._base import _CliBase
 from .exceptions import (
     UserException, DeveloperException,
-    RequiredFlagError, BadFlagError
+    RequiredFlagError, BadFlagError,
+    CommandNotFound,
 )
 
 from typing import Optional, List, Generator, Callable, Any
@@ -48,11 +49,10 @@ class Command(_CliBase):
 
         self._meta = _FunctionMeta(
             self.callback,
-            instance=kwrgs.pop('__instance__', None)
+            instance=kwrgs.pop('__instance__', None) # for commands that are part of a group
         )
-        self._help = self._meta.helpstr
         self._usage = kwrgs.pop('usage', f'{self._meta.name} [options]')
-        self._help = kwrgs.pop('help', self._help)
+        self._help = kwrgs.pop('help', self._meta.helpstr)
 
         self.args: List[str] = []
         self.flags = FlagSet(
@@ -151,6 +151,7 @@ def _retrieve_commands(obj):
         ok = (
             not name.startswith('_') and
             isinstance(attr, (
+                staticmethod,
                 FunctionType,
                 MethodType,
                 _CliBase,
@@ -160,6 +161,8 @@ def _retrieve_commands(obj):
             if attr in seen:
                 if isinstance(attr, _CliBase):
                     aliases[attr.name] = name
+                elif isinstance(attr, staticmethod):
+                    aliases[attr.__func__.__name__] = name
                 else:
                     aliases[attr.__name__] = name
             else:
@@ -180,6 +183,10 @@ class SubCommand(Command):
     '''
 
     def __init__(self, callback, hidden=False, **kwrgs):
+        if isinstance(callback, staticmethod):
+            callback = callback.__func__
+            kwrgs.pop('__instance__')  # static methods do not need an instance
+
         self.group = kwrgs.pop('__command_group__', None)
         super().__init__(callback, **kwrgs)
         self.hidden = hidden
@@ -208,18 +215,18 @@ class Group(_CliBase):
 
         if isinstance(obj, type):
             init = kwrgs.pop('init', dict())
-            self.inst = obj(**init) # TODO: find a way to make this safer
+            self.inst = obj(**init)
             self.type = obj
         else:
-            ...
             self.inst = obj
             self.type = obj.__class__
 
         self.args = []
         self.name = self.type.__name__
 
-        # self.commands = dict(_find_commands(self.type))
         self.commands, self.aliases = _retrieve_commands(self.type)
+        for k, alias in self.aliases.items():
+            self.commands[alias] = self.commands[k]
 
         self._hidden = kwrgs.pop('hidden', set())
         for c in self.commands.values():
@@ -332,7 +339,11 @@ class Group(_CliBase):
                     # if we have not found a sub-command yet then the unkown
                     # flag should not be passed on to any other commands we
                     # should throw and error for an unknown flag
-                    raise BadFlagError(f'{arg!r} is not a flag')
+                    if self.args:
+                        raise CommandNotFound(f'{self.args[0]!r} is not a command')
+                    else:
+                        raise BadFlagError(f'{arg!r} is not a flag')
+
                 # if the flag is not in the group, then it might be
                 # for the next command (self.args is passed the the next
                 # command).
@@ -353,8 +364,6 @@ class Group(_CliBase):
             setattr(self.inst, arg, val)
         return nextcmd
 
-    # TODO: hidden sub-commands should go here
-    # make a Sub-Command class that has a hidden attibute to make this cleaner
     def _command_help(self) -> Optional[str]:
         docs = []
         keys = []

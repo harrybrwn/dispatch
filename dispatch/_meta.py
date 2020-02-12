@@ -207,7 +207,7 @@ class _GroupMeta(_CliMeta):
         return names
 
     def run(self):
-        raise NotImplementedError('')
+        raise NotImplementedError
 
     def params(self) -> tuple:
         raise NotImplementedError
