@@ -87,7 +87,8 @@ class Command(_CliBase):
             res = self._meta.run(**fn_args)
 
         if isinstance(res, int):
-            sys.exit(res)
+            # sys.exit(res)
+            ...
         elif res and isinstance(res, str):
             print(res)
         return res
@@ -197,7 +198,7 @@ class SubCommand(Command):
     def usage(self):
         if self.group is None:
             return self._usage
-        return f'{self.group.name} {self._meta.name} [options]'
+        return f'{self.group.name} {self._usage}'
 
 
 class Group(_CliBase):
@@ -292,6 +293,7 @@ class Group(_CliBase):
 
         return cmd(self.args)
 
+    # this is only really used while testing
     def _reset(self):
         self.args = []
         for f in self.flags.values():
@@ -347,12 +349,14 @@ class Group(_CliBase):
                         raise BadFlagError(f'{arg!r} is not a flag')
 
                 # if the flag is not in the group, then it might be
-                # for the next command (self.args is passed the the next
-                # command).
+                # for the next command (self.args is eventually passed
+                # to the next command).
                 self.args.append(raw_arg)
                 continue
             elif flag.type is not bool:
                 if val is None:
+                    # When the flag needs a value but there are no more arguments or
+                    # the next argument is a flag then we raise an error.
                     if not args or args[0].startswith('-'):
                         raise UserException(f'{raw_arg!r} must be given a value.')
                     val = args.pop(0)
@@ -361,7 +365,8 @@ class Group(_CliBase):
                 if val is not None:
                     raise UserException(f'{raw_arg!r} should not be given a value.')
                 val = True
-            setattr(self.inst, arg, val)
+            # use flag.name just in case 'arg' is the shorthand
+            setattr(self.inst, flag.name, val)
         return nextcmd
 
     def _command_help(self) -> Optional[str]:
@@ -409,7 +414,7 @@ def helptext(fn) -> str:
 
 
 def command(_obj=None, **kwrgs):
-    '''A decorator for creating commands
+    '''A decorator for creating cli commands
 
     Keyword Args:
         usage (str): Give the command a custom usage line.
@@ -466,9 +471,9 @@ def handle(fn):
     return 0
 
 
-command.__doc__ = f'''
-    Decrotator that creates a Command
-{Command.__init__.__doc__}'''
+# command.__doc__ = f'''
+#     Decrotator that creates a Command
+# {Command.__init__.__doc__}'''
 
 Command.__init__.__doc__ = f'''
     Initialze a new Command

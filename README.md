@@ -1,6 +1,6 @@
 # dispatch
 
-A low information-redundancy cli framework for a quick and dirty way of converting python scripts to a command line tool.
+A low information-redundancy cli framework for a quick and dirty way of converting python a script to a command line tool.
 
 Inspired by [fire](https://github.com/google/python-fire) and [click](https://click.palletsprojects.com/).
 
@@ -45,11 +45,11 @@ Usage:
     hello [options]
 
 Options:
-        --name      Name of the person you are saying hello to.
-    -v, --verbose   Run the command verbosly
-        --debug
-        --file      Either stdout or stderr (default: stdout)
-    -h, --help      Get help.
+        --name      Name of the person you are saying hello to. 
+    -v, --verbose   Run the command verbosly 
+        --debug      
+        --file      Either stdout or stderr (default: 'stdout')
+    -h, --help      Get help. 
 ```
 
 Arguments
@@ -92,7 +92,6 @@ Flag Types
 ----------
 Dispatch uses type annotations to infer flag types and will use those annotations to convert the arguments given.
 ```python
-# cli.py
 @dispatch.command
 def cli(num: complex, decimal: float):
     pass
@@ -102,7 +101,16 @@ When the program `cli.py` is executed it will convert each argument to its type.
 python cli.py --num=5+3j --decimal=5.9
 ```
 For this command, the parser internals will eventually call `complex('5+3j')` and `float('5.9')` before giving the values as function arguments.
-What this means is that you can use any type as long it has an `__init__` function that takes one argument. However there are exceptions
+What this means is that you can use any type as long it has an `__init__` function that takes one argument. If a flag is given a default value and no type annotation, the flag will inherit whatever type is given as default.
+
+Default Values
+--------------
+```python
+@dispatch.command(hidden_defaults={'one', 'two'})
+def cli(one=1, two=2, other_stuff=None): pass
+```
+To specify a default value, simply set the function argument as you would with regular python code. The default values will be displayed in the help view of the command unless a `set` of type `str` is passed to the decorator as the 'hidden_defaults' argument. This will hide any default values from the help message. Falsy defaults that are non-boolean like an empty string will also be hidden.
+
 
 Multiple Commands
 =================
@@ -115,7 +123,10 @@ from dispatch import command
 
 @command
 class multicommand:
-    verbose: bool = False
+    ''':v verbose: print stuff verbosly'''
+
+    verbose: bool
+    filename = 'README.md'
 
     def cat(self, file: str):
         '''Print a file
@@ -126,8 +137,16 @@ class multicommand:
         print(open(file, 'r').read())
 
     def do(self, thing):
-        '''Do a thing'''
+        '''Do a thing
+
+        :thing: the thing you will be doing'''
         print('doing', thing)
+
+    def _helper(self):
+        '''functions that start with an underscore are not
+        interpreted as commands (not even hidden commands).
+        '''
+        pass
 
 if __name__ == "__main__":
     multicommand()
@@ -144,10 +163,11 @@ Usage:
     multicommand [options] [command]
 
 Options:
-        --verbose    (default: False)
-    -h, --help      Get help.
+    -v, --verbose    print stuff verbosly 
+        --filename    (default: 'README.md')
+    -h, --help       Get help. 
 
 Commands:
-    cat Print a file
-    do  Do a thing
+    cat   Print a file
+    do    Do a thing
 ```

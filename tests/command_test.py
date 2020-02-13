@@ -127,7 +127,7 @@ def test_incomplete_doc_parsing():
     assert '-l, --hello' in fn2.helptext()
     assert 'say hello' in fn2.helptext()
 
-EMPTY_HELP = 'Usage:\n    {name} [options]\n\nOptions:\n    -h, --help   Get help. '
+EMPTY_HELP = 'Usage:\n    {name} [options]\n\nOptions:\n    -h, --help   Get help.'
 
 def test_bad_doc():
     def f1(verbose: bool): pass
@@ -200,8 +200,6 @@ def test_command_settings(capsys):
     f1(['-v'])  # pylint: disable=no-value-for-parameter
     assert 'debug' not in f1.helptext()
     assert 'verbose' not in f1.helptext()
-    out, err = capsys.readouterr()
-    assert out == '76\n'
 
     @command(shorthands={'debug': 'd'},
              help="f2 is a test command")

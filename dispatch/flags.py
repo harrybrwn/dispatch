@@ -48,7 +48,7 @@ class Option:
         else:
             short = ' ' * 4
 
-        return '{0}{short}--{name:{1}}{help} {default}'.format(
+        return '{0}{short}--{name:{1}}{help}{default}'.format(
             prefix, name_spec, short=short,
             name=self.name.replace('_', '-'),
             help=self.help,
@@ -76,12 +76,11 @@ class Option:
             self.type = val.__class__
 
     def show_default(self) -> str:
-        if not self.has_default or self.hide_default:
-            return ''
-        elif self.type is not bool and self.value:
-            return f'(default: {self.value!r})'
-        elif self.type is bool:
-            return f'(default: {self.value!r})'
+        if self.has_default and not self.hide_default and self.value:
+            if self.help:
+                return f' (default: {self.value!r})'
+            else:
+                return f'default: {self.value!r}'
         return ''
 
     def setval(self, val):
