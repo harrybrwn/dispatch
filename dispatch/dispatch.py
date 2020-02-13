@@ -367,7 +367,11 @@ class Group(_CliBase):
     def _command_help(self) -> Optional[str]:
         docs = []
         keys = []
-        for k in self.commands.keys():
+
+        cmds = {k: v for k, v in self.commands.items()}
+        for alias in self.aliases.values():
+            cmds.pop(alias)
+        for k in cmds.keys():
             if k in self._hidden:
                 continue
             if k in self.aliases:
