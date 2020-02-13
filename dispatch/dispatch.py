@@ -86,7 +86,9 @@ class Command(_CliBase):
         else:
             res = self._meta.run(**fn_args)
 
-        if res is not None:
+        if isinstance(res, int):
+            sys.exit(res)
+        elif res and isinstance(res, str):
             print(res)
         return res
 
@@ -348,8 +350,6 @@ class Group(_CliBase):
                 # for the next command (self.args is passed the the next
                 # command).
                 self.args.append(raw_arg)
-                if val is not None:
-                    self.args.append(val)
                 continue
             elif flag.type is not bool:
                 if val is None:
