@@ -204,11 +204,12 @@ def test_group_init():
             assert two == 2
             assert three == 3
 
-@pytest.mark.xfail
+# @pytest.mark.xfail
 def test_group_init_fail_2():
-    @command
-    class cmd:
-        def __init__(self, an_arg): ...
+    with pytest.raises(TypeError):
+        @command
+        class cmd:
+            def __init__(self, an_arg): ...
 
 def test_hidden():
     settings = dict(
@@ -270,25 +271,18 @@ def test_group_err(capsys):
 
     sysexit = sys.exit
     sys.exit = f
-    @command
+    @command(silent=True)
     class cmd:
         verbose: bool
 
-    # with raises(TypeError):
-    #     cmd([])
+    with raises(TypeError):
+        cmd([])
 
     sys.exit = sysexit
     hlp = cmd.helptext()
     assert 'Commands:' not in hlp
     with raises(BadFlagError, match="'notaflag' is not a flag"):
         cmd(['--notaflag'])
-
-@pytest.mark.xfail
-def test_function():
-    def func(arg, kwd=None):
-        ...
-    func(**{'arg': 'what', 'kwd': 5, 'another': 'what'})
-
 
 def test_subcommand():
     @command
@@ -321,6 +315,32 @@ def test_command_aliases():
     for i in itms:
         assert i in hlp
 
+def test_group_options():
+    @command(hidden={'nothere'}, init={'name': 'bob'})
+    class cmd:
+        global_flag: bool
+
+        def __init__(self, name):
+            self.name = name
+            self.something = 'nothing'
+
+        def do(self, a_thing: str):
+            assert self.name == 'bob'
+            assert self.global_flag
+            assert self.something == 'nothing'
+            name = self.name
+            print(f'{name} is doing {a_thing}')
+        def nothere(self):
+            ...
+    cmd(['do', '--a-thing', 'a cool thing', '--global-flag'])
+    cmd._reset()
+    with pytest.raises(AssertionError):
+        cmd(['do', '--a-thing', 'what'])  # no '--global-flag'
+    cmd._reset()
+    hlp = cmd.helptext()
+    assert 'nothere' not in hlp
+    print(hlp)
+
 def test_static_subcommands():
     @command
     class cmd:
@@ -329,14 +349,28 @@ def test_static_subcommands():
             '''hello'''
             assert a_flag == 'yes'
 
-        # @staticmethod
-        def func(self, yes):
+        @staticmethod
+        def func(yes):
             '''i am a func'''
             assert yes
         function = func
-
     cmd(['inner', '--a-flag', 'yes'])
     cmd._reset()
     cmd(['function', '--yes'])
     cmd._reset()
     cmd(['func', '--yes'])
+
+def test_classmethod_subcommand():
+    pytest.skip('not done here')
+    @command
+    class cmd:
+        @classmethod
+        def inner(cls, a_flag: str):
+            '''hello'''
+            assert a_flag == 'oh yes'
+        @classmethod
+        def func(cls, yes):
+            '''i am a func'''
+            assert yes
+        function = func
+    cmd(['inner', '--a-flag="oh yes"'])

@@ -45,11 +45,11 @@ Usage:
     hello [options]
 
 Options:
-        --name      Name of the person you are saying hello to. 
-    -v, --verbose   Run the command verbosly 
-        --debug      
+        --name      Name of the person you are saying hello to.
+    -v, --verbose   Run the command verbosly
+        --debug
         --file      Either stdout or stderr (default: 'stdout')
-    -h, --help      Get help. 
+    -h, --help      Get help.
 ```
 
 Arguments
@@ -163,9 +163,9 @@ Usage:
     multicommand [options] [command]
 
 Options:
-    -v, --verbose    print stuff verbosly 
-        --filename    (default: 'README.md')
-    -h, --help       Get help. 
+        --filename   default: 'README.md'
+    -v, --verbose    print stuff verbosly
+    -h, --help       Get help.
 
 Commands:
     cat   Print a file

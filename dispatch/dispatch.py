@@ -208,17 +208,26 @@ class Group(_CliBase):
             obj: a class that will be used as the command groups
 
         Keyword args:
-            usage:
-            help_template:
+            usage: A string displayed in the usage part of the help message.
+            hidden: A set of names of commands or flags that should be hidden.
+            init: A dictionary that will be passes to the classes init function.
+            help_template: Give a custom template for the help message.
+            help: Give a custom description for the help message.
+            silent: 'True' to stop the help message from printing when no arguments are given.
             doc_help:
-            help:
         '''
         super().__init__(**kwrgs)
         self._usage = kwrgs.pop('usage', None)
+        self.silent = kwrgs.pop('silent', False)
 
         if isinstance(obj, type):
             init = kwrgs.pop('init', dict())
-            self.inst = obj(**init)
+            try:
+                self.inst = obj(**init)
+            except TypeError:
+                raise TypeError(
+                    f"""can't call __init__ for a {obj.__name__},
+        try passing the 'init' dict as an argument to @command.""")
             self.type = obj
         else:
             self.inst = obj
@@ -246,6 +255,7 @@ class Group(_CliBase):
         )
 
         def new_getattr(this, name):
+            print(this)
             if name in self.flags:
                 flag = self.flags[name]
                 return flag.value or flag._getnull()
@@ -288,7 +298,8 @@ class Group(_CliBase):
             if cmd is None:
                 return
         elif cmd is None:
-            self.help()
+            if not self.silent:
+                self.help()
             sys.exit(1)
 
         return cmd(self.args)

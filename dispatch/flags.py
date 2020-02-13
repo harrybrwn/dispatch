@@ -26,7 +26,7 @@ class Option:
         self._default = value
         self.has_default = has_default or value is not None
         self.hide_default = hide_default
-        self.f_len = len(self.name)  # temp value, should be set later
+        self.f_len = len(self.name)  # len(name) is temp, will be set when formatting
 
         if self.shorthand == 'h' and self.name != 'help':
             raise DeveloperException(
@@ -52,7 +52,7 @@ class Option:
             prefix, name_spec, short=short,
             name=self.name.replace('_', '-'),
             help=self.help,
-            default=self.show_default() if self.has_default else '',
+            default=self.show_default(),
         )
 
     def __repr__(self):
@@ -129,7 +129,6 @@ class Option:
         if self.has_default:
             return self._default
 
-        return self.type()
         try:
             return self.type()
         except TypeError:
@@ -207,7 +206,7 @@ class FlagSet:
     def help(self) -> str:
         fmt = '    {0:<{1}}'
         lngth = self.format_len
-        return '\n'.join([fmt.format(f, lngth) for f in self.visible_flags()])
+        return '\n'.join(fmt.format(f, lngth) for f in self.visible_flags())
 
     def __str__(self):
         return str(self._flags)
