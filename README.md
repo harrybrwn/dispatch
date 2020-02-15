@@ -171,3 +171,37 @@ Commands:
     cat   Print a file
     do    Do a thing
 ```
+
+Group Flags
+------------
+You can define flags that are used at a class level and can be accessed by all commands in the cli. To do this you can set a class variable or you can use a type annotation if you do not want the flag to have a default value. When retrieving the value of these flags you can simply use them like any class attribute with `self.attr_name`.
+```python
+@dispatch.command
+class cli:
+    verbose: bool
+    filename = 'notes.txt'
+```
+
+Command Aliases
+---------------
+Aliasing commands is really simple. All you need to do is assign the function you want to alias to another variable inside the class.
+```python
+@dispatch.command
+class cli:
+    def command(self):
+        '''This is a command.'''
+        pass
+
+    cmd = command
+```
+
+```
+Usage:
+    cli [options] [command]
+
+Options:
+    -h, --help   Get help.
+
+Commands:
+    command, cmd   This is a command.
+```

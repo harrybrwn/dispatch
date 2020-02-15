@@ -12,6 +12,7 @@
 # Dev
 __pycache__/
 /.vscode/
+*.swp
 
 # Misc.
 example.py

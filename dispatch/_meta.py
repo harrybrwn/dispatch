@@ -219,9 +219,6 @@ class _GroupMeta(_CliMeta):
         return self._annotations
 
 
-def _run_group(root, *, run=None, kwargs=None): ...
-
-
 def _isgroup(obj) -> bool:
     return not isinstance(obj, (
         classmethod, staticmethod,

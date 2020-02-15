@@ -114,11 +114,7 @@ class Command(_CliBase):
                 continue
 
             arg = arg.lstrip('-').replace('-', '_')
-
-            val = None
-            if '=' in arg:
-                arg, val = arg.split('=')
-
+            arg, *_, val = arg.partition('=')
             flag = self.flags.get(arg)
 
             if not flag:
@@ -255,7 +251,6 @@ class Group(_CliBase):
         )
 
         def new_getattr(this, name):
-            print(this)
             if name in self.flags:
                 flag = self.flags[name]
                 return flag.value or flag._getnull()
@@ -343,12 +338,11 @@ class Group(_CliBase):
                 self.args.append(raw_arg)
                 continue
 
+            val: Any
             arg = raw_arg.lstrip('-').replace('-', '_')
-            val: Any = None
-            if '=' in arg:
-                arg, val = arg.split('=')
-
+            arg, _, val = arg.partition('=')
             flag = self.flags.get(arg)
+
             if flag is None:
                 if nextcmd is None:
                     # if we have not found a sub-command yet then the unkown
@@ -365,7 +359,7 @@ class Group(_CliBase):
                 self.args.append(raw_arg)
                 continue
             elif flag.type is not bool:
-                if val is None:
+                if not val:
                     # When the flag needs a value but there are no more arguments or
                     # the next argument is a flag then we raise an error.
                     if not args or args[0].startswith('-'):
@@ -373,7 +367,7 @@ class Group(_CliBase):
                     val = args.pop(0)
             else:
                 # catch the case where '=' has been used
-                if val is not None:
+                if val:
                     raise UserException(f'{raw_arg!r} should not be given a value.')
                 val = True
             # use flag.name just in case 'arg' is the shorthand
@@ -481,10 +475,6 @@ def handle(fn):
         return 1
     return 0
 
-
-# command.__doc__ = f'''
-#     Decrotator that creates a Command
-# {Command.__init__.__doc__}'''
 
 Command.__init__.__doc__ = f'''
     Initialze a new Command

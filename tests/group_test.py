@@ -121,55 +121,54 @@ def testFindCommands():
 
 
 def testTypes():
-        # TODO: make this work without calling int(val)
-        class thing:
-            def __init__(self, val=0): self.val = int(val)
+    class thing:
+        def __init__(self, val=0): self.val = int(val)
 
-        class cmd:
-            value: str
-            num: float
-            t: thing
-            asnull: bool = False
+    class cmd:
+        value: str
+        num: float
+        t: thing
+        asnull: bool = False
 
-            def __init__(self):
-                self.value = 'hello'
+        def __init__(self):
+            self.value = 'hello'
+            assert self.value == 'hello'
+
+        def __call__(self):
+            if self.asnull:
                 assert self.value == 'hello'
-
-            def __call__(self):
-                if self.asnull:
-                    assert self.value == 'hello'
-                    assert self.num == 0.0
-                    assert self.asnull == True
-                else:
-                    assert self.value == 'this is a test value'
-                    assert self.num == 3.14159
-                    assert self.t.val == 98
-                assert isinstance(self.asnull, bool)
-                assert isinstance(self.value, str)
-                assert isinstance(self.num, float)
-                assert isinstance(self.t, thing)
-        g = Group(cmd)
-        g(['--asnull'])
-        assert g.inst.value == 'hello'
-        assert g.inst.value == 'hello'
-        assert g.flags['value'].value == 'hello'
-        g._reset()
-        g(['--value=this is a test value', '--num=3.14159', '--t=98'])
-        assert g.flags['value'].value == 'this is a test value'
-        assert g.inst.value == 'this is a test value'
-        assert g.flags['num'].value == 3.14159
-        assert g.inst.num == 3.14159
-        assert g.flags['t'].value.val == 98
-        assert g.inst.t.val == 98
-        g._reset()
-        g(['--value', 'this is a test value', '--num', '3.14159', '-t', '98'])
-        assert g.flags['value'].value == 'this is a test value'
-        assert g.inst.value == 'this is a test value'
-        assert g.flags['num'].value == 3.14159
-        assert g.inst.num == 3.14159
-        assert g.flags['t'].value.val == 98
-        assert g.inst.t.val == 98
-        g._reset()
+                assert self.num == 0.0
+                assert self.asnull == True
+            else:
+                assert self.value == 'this is a test value'
+                assert self.num == 3.14159
+                assert self.t.val == 98
+            assert isinstance(self.asnull, bool)
+            assert isinstance(self.value, str)
+            assert isinstance(self.num, float)
+            assert isinstance(self.t, thing)
+    g = Group(cmd)
+    g(['--asnull'])
+    assert g.inst.value == 'hello'
+    assert g.inst.value == 'hello'
+    assert g.flags['value'].value == 'hello'
+    g._reset()
+    g(['--value=this is a test value', '--num=3.14159', '--t=98'])
+    assert g.flags['value'].value == 'this is a test value'
+    assert g.inst.value == 'this is a test value'
+    assert g.flags['num'].value == 3.14159
+    assert g.inst.num == 3.14159
+    assert g.flags['t'].value.val == 98
+    assert g.inst.t.val == 98
+    g._reset()
+    g(['--value', 'this is a test value', '--num', '3.14159', '-t', '98'])
+    assert g.flags['value'].value == 'this is a test value'
+    assert g.inst.value == 'this is a test value'
+    assert g.flags['num'].value == 3.14159
+    assert g.inst.num == 3.14159
+    assert g.flags['t'].value.val == 98
+    assert g.inst.t.val == 98
+    g._reset()
 
 def test_bool_parse():
     negate = True
@@ -204,7 +203,6 @@ def test_group_init():
             assert two == 2
             assert three == 3
 
-# @pytest.mark.xfail
 def test_group_init_fail_2():
     with pytest.raises(TypeError):
         @command
@@ -290,11 +288,9 @@ def test_subcommand():
         @subcommand
         def inner(self):
             '''hello'''
-            ...
         @subcommand
         def func(self):
             '''i am a func'''
-            ...
     hlp = cmd.helptext()
     assert SubCommand.__doc__[:15].strip() not in hlp
 
@@ -329,7 +325,6 @@ def test_group_options():
             assert self.global_flag
             assert self.something == 'nothing'
             name = self.name
-            print(f'{name} is doing {a_thing}')
         def nothere(self):
             ...
     cmd(['do', '--a-thing', 'a cool thing', '--global-flag'])
@@ -339,7 +334,6 @@ def test_group_options():
     cmd._reset()
     hlp = cmd.helptext()
     assert 'nothere' not in hlp
-    print(hlp)
 
 def test_static_subcommands():
     @command
