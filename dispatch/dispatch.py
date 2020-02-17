@@ -113,30 +113,28 @@ class Command(_CliBase):
                 self.args.append(arg)
                 continue
 
-            arg = arg.lstrip('-').replace('-', '_')
-            arg, *_, val = arg.partition('=')
+            arg, val = _CliBase.process_arg(arg)
             flag = self.flags.get(arg)
 
             if not flag:
                 raise UserException(f'could not find flag {arg!r}')
 
             if flag.type is not bool:
+                # When the flag needs a value but there are no more arguments or
+                # the next argument is a flag then we raise an error.
                 if not val:
-                    if args and args[0][0] != '-':
-                        # if the next arg is not a flag then it is the flag val
-                        # but only if it is not for a boolean flag
-                        val = args.pop(0)
-                    else:
-                        raise UserException(
-                            f'no value given for --{flag.name}')
+                    if not args or args[0].startswith('-'):
+                        raise UserException(f'no value given for --{flag.name}')
+                    val = args.pop(0)
                 flag.setval(val)
             else:
+                # catch the case where '=' has been used
                 if val:
                     raise UserException(f'cannot give {flag.name!r} flag a value')
                 elif flag.has_default:
                     flag.value = not flag._default
                 else:
-                    flag.value = True if flag.value is None else flag.value
+                    flag.value = True
         return {n: f.value for n, f in self.flags.items()}
 
     def run(self, argv=sys.argv):
@@ -338,9 +336,7 @@ class Group(_CliBase):
                 self.args.append(raw_arg)
                 continue
 
-            val: Any
-            arg = raw_arg.lstrip('-').replace('-', '_')
-            arg, _, val = arg.partition('=')
+            arg, val = _CliBase.process_arg(raw_arg)
             flag = self.flags.get(arg)
 
             if flag is None:
@@ -363,17 +359,22 @@ class Group(_CliBase):
                     # When the flag needs a value but there are no more arguments or
                     # the next argument is a flag then we raise an error.
                     if not args or args[0].startswith('-'):
-                        raise UserException(f'{raw_arg!r} must be given a value.')
+                        raise UserException(f'no value given for --{flag.name}')
                     val = args.pop(0)
+                flag.setval(val)
             else:
                 # catch the case where '=' has been used
                 if val:
-                    raise UserException(f'{raw_arg!r} should not be given a value.')
-                val = True
+                    raise UserException(f'cannot give {flag.name!r} flag a value')
+                elif flag.has_default:
+                    flag.value = not flag._default
+                else:
+                    flag.value = True
             # use flag.name just in case 'arg' is the shorthand
-            setattr(self.inst, flag.name, val)
+            setattr(self.inst, flag.name, flag.value)
         return nextcmd
 
+    # TODO: this is a totol mess, please someone fix this.
     def _command_help(self) -> Optional[str]:
         docs = []
         keys = []

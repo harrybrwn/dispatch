@@ -1,6 +1,8 @@
 import sys
 import jinja2
 
+from typing import Tuple, Any
+
 HELP_TMPL = '''{%- if main_doc -%}
 {{ main_doc }}
 
@@ -29,6 +31,12 @@ class _CliBase:
 
     def help(self, file=sys.stdout):
         print(self.helptext(), file=file)
+
+    @staticmethod
+    def process_arg(raw) -> Tuple[str, Any]:
+        arg = raw.lstrip('-').replace('-', '_')
+        arg, _, val = arg.partition('=')
+        return arg, val or None
 
     def helptext(self, template=None):
         if self.doc_help:

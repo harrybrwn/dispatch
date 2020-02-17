@@ -315,6 +315,7 @@ def test_group_options():
     @command(hidden={'nothere'}, init={'name': 'bob'})
     class cmd:
         global_flag: bool
+        what: bool = True
 
         def __init__(self, name):
             self.name = name
@@ -326,7 +327,7 @@ def test_group_options():
             assert self.something == 'nothing'
             name = self.name
         def nothere(self):
-            ...
+            assert not self.what
     cmd(['do', '--a-thing', 'a cool thing', '--global-flag'])
     cmd._reset()
     with pytest.raises(AssertionError):
@@ -334,6 +335,7 @@ def test_group_options():
     cmd._reset()
     hlp = cmd.helptext()
     assert 'nothere' not in hlp
+    cmd(['nothere', '--what'])
 
 def test_static_subcommands():
     @command
