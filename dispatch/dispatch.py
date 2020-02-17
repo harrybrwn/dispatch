@@ -119,22 +119,7 @@ class Command(_CliBase):
             if not flag:
                 raise UserException(f'could not find flag {arg!r}')
 
-            if flag.type is not bool:
-                # When the flag needs a value but there are no more arguments or
-                # the next argument is a flag then we raise an error.
-                if not val:
-                    if not args or args[0].startswith('-'):
-                        raise UserException(f'no value given for --{flag.name}')
-                    val = args.pop(0)
-                flag.setval(val)
-            else:
-                # catch the case where '=' has been used
-                if val:
-                    raise UserException(f'cannot give {flag.name!r} flag a value')
-                elif flag.has_default:
-                    flag.value = not flag._default
-                else:
-                    flag.value = True
+            self._setflag(args, arg, val, flag)
         return {n: f.value for n, f in self.flags.items()}
 
     def run(self, argv=sys.argv):
@@ -347,30 +332,15 @@ class Group(_CliBase):
                     if self.args:
                         raise CommandNotFound(f'{self.args[0]!r} is not a command')
                     else:
-                        raise BadFlagError(f'{arg!r} is not a flag')
+                        raise BadFlagError(f'{raw_arg!r} is not a flag')
 
                 # if the flag is not in the group, then it might be
                 # for the next command (self.args is eventually passed
                 # to the next command).
                 self.args.append(raw_arg)
                 continue
-            elif flag.type is not bool:
-                if not val:
-                    # When the flag needs a value but there are no more arguments or
-                    # the next argument is a flag then we raise an error.
-                    if not args or args[0].startswith('-'):
-                        raise UserException(f'no value given for --{flag.name}')
-                    val = args.pop(0)
-                flag.setval(val)
-            else:
-                # catch the case where '=' has been used
-                if val:
-                    raise UserException(f'cannot give {flag.name!r} flag a value')
-                elif flag.has_default:
-                    flag.value = not flag._default
-                else:
-                    flag.value = True
-            # use flag.name just in case 'arg' is the shorthand
+
+            self._setflag(args, arg, val, flag)
             setattr(self.inst, flag.name, flag.value)
         return nextcmd
 

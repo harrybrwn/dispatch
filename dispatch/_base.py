@@ -1,5 +1,6 @@
 import sys
 import jinja2
+from .exceptions import UserException
 
 from typing import Tuple, Any
 
@@ -59,3 +60,21 @@ class _CliBase:
             'flags': flags,
             'command_help': command_help,
         })
+
+    def _setflag(self, args, arg, val, flag):
+        if flag.type is not bool:
+            # When the flag needs a value but there are no more arguments or
+            # the next argument is a flag then we raise an error.
+            if not val:
+                if not args or args[0].startswith('-'):
+                    raise UserException(f'no value given for --{flag.name}')
+                val = args.pop(0)
+            flag.setval(val)
+        else:
+            # catch the case where '=' has been used
+            if val:
+                raise UserException(f'cannot give {flag.name!r} flag a value')
+            elif flag.has_default:
+                flag.value = not flag._default
+            else:
+                flag.value = True
