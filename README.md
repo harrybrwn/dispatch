@@ -1,8 +1,10 @@
 # dispatch
 
-A low information-redundancy cli framework for a quick and dirty way of converting python a script to a command line tool.
+A low information-redundancy CLI framework for a quick and dirty way of converting python a script to a command line tool.
 
-Inspired by [fire](https://github.com/google/python-fire) and [click](https://click.palletsprojects.com/).
+The idea behind this framework is that functions and classes have one-to-one correspondence to command line interfaces with functions as commands and arguments as flags. This framework allows users to define a function or a class in plain python and turn it into a CLI with one decorator.
+
+This was inspired by [fire](https://github.com/google/python-fire) and [click](https://click.palletsprojects.com/).
 
 ## Install
 ```
