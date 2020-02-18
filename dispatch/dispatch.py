@@ -19,6 +19,8 @@ class Command(_CliBase):
     def __init__(self, callback: Callable, **kwrgs):
         # note: docs are modified at runtime
         '''
+        Initialze a new Command
+
         Args:
             callback: a function that runs the command
 
@@ -119,7 +121,7 @@ class Command(_CliBase):
             if not flag:
                 raise UserException(f'could not find flag {arg!r}')
 
-            self._setflag(args, arg, val, flag)
+            self._setflag_from_args(args, arg, val, flag)
         return {n: f.value for n, f in self.flags.items()}
 
     def run(self, argv=sys.argv):
@@ -340,7 +342,7 @@ class Group(_CliBase):
                 self.args.append(raw_arg)
                 continue
 
-            self._setflag(args, arg, val, flag)
+            self._setflag_from_args(args, arg, val, flag)
             setattr(self.inst, flag.name, flag.value)
         return nextcmd
 
@@ -445,8 +447,3 @@ def handle(fn):
         print('Error:', e, file=sys.stderr)
         return 1
     return 0
-
-
-Command.__init__.__doc__ = f'''
-    Initialze a new Command
-{Command.__init__.__doc__}'''

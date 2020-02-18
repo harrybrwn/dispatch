@@ -279,7 +279,7 @@ def test_group_err(capsys):
     sys.exit = sysexit
     hlp = cmd.helptext()
     assert 'Commands:' not in hlp
-    with raises(BadFlagError, match="'notaflag' is not a flag"):
+    with raises(BadFlagError, match="'--notaflag' is not a flag"):
         cmd(['--notaflag'])
 
 def test_subcommand():

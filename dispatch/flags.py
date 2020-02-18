@@ -214,7 +214,7 @@ class FlagSet:
     def __len__(self):
         return len(self._flags)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> Option:
         if len(key) == 1 and key in self._shorthands:
             key = self._shorthands[key]
         return self._flags[key]

@@ -61,7 +61,16 @@ class _CliBase:
             'command_help': command_help,
         })
 
-    def _setflag(self, args, arg, val, flag):
+    def _setflag_from_args(self, args: list, arg: str, val: Any, flag):
+        '''
+        Do not use this.
+
+        This function only exists to limit code reuse. There is no useful
+        metaphore for understanding what this function does.
+
+        It will set the value of a flag or find the value, otherwise it will
+        throw an exception.
+        '''
         if flag.type is not bool:
             # When the flag needs a value but there are no more arguments or
             # the next argument is a flag then we raise an error.
