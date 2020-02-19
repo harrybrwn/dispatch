@@ -307,8 +307,7 @@ class Group(_CliBase):
         return SubCommand(fn, __instance__=self.inst, __command_group__=self)
 
     def parse_args(self, args: List[str]) -> Optional[SubCommand]:
-        # TODO: use the Flag.setval in addition to this method of saving
-        # the variable.
+        # TODO: add support for multiple flag shorthands (-vxcf instead of -v -x -c -f)
         nextcmd = None
         while args:
             # Need to find either a command or a flag
@@ -346,8 +345,11 @@ class Group(_CliBase):
             setattr(self.inst, flag.name, flag.value)
         return nextcmd
 
-    # TODO: this is a totol mess, please someone fix this.
+    # TODO: this is a totol mess, please, someone fix this.
     def _command_help(self) -> Optional[str]:
+        '''
+        returns the command part of the help text as a string.
+        '''
         docs = []
         keys = []
 

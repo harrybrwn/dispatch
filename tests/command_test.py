@@ -1,13 +1,14 @@
 import pytest
 from pytest import raises
 
-import sys
+import sys, os
 from os.path import dirname
 sys.path.insert(0, dirname(dirname(__file__)))
 
 from dispatch.exceptions import UserException, DeveloperException
 from dispatch.dispatch import Command, command
 from dispatch._meta import _parse_flags_doc, _FunctionMeta
+from dispatch.types import Env
 
 def test_command():
     CFG_FILE = '/home/user/.local/etc/config.cfg'
@@ -281,3 +282,9 @@ def testArgParsing():
 def test_none_command():
     with raises(DeveloperException):
         c = Command(None)
+
+def test_env_arg():
+    @command
+    def cli(path: Env):
+        assert str(path) == os.getenv('HOME')
+    cli(['--path=HOME'])
