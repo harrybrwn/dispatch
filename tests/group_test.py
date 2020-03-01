@@ -370,3 +370,16 @@ def test_classmethod_subcommand():
             assert yes
         function = func
     cmd(['inner', '--a-flag="oh yes"'])
+
+def test_flags_in_init():
+    # TODO: the command decorator will call __init__ before the Group knows about the flags that are from
+    # annotations. This test will always fail if this is not fixed
+    @command
+    class cmd:
+        path: str
+        def __init__(self):
+            assert self.path == 'the/correct/path'
+        def subcmd(self):
+            assert self.path == 'the/other/correct/path'
+    cmd(['--path', 'the/correct/path'])
+    cmd(['subcmd', '--path', 'the/other/correct/path'])

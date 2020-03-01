@@ -68,6 +68,7 @@ def testDocParsing():
 
         :      t              tag :this is a tag
 
+     :return: None
         '''
     parsed = _parse_flags_doc(fn.__doc__)
     assert 'verbose' in parsed
@@ -108,6 +109,8 @@ def testDocParsing():
     assert cmd.flags['tag'].value == ''
 
     hlp = cmd.helptext()
+    assert 'return' not in hlp
+    assert '--return' not in hlp
     for name, flag in cmd.flags.items():
         assert name in hlp
         assert flag.help in hlp
@@ -285,6 +288,24 @@ def test_none_command():
 
 def test_env_arg():
     @command
-    def cli(path: Env):
+    def cli(path: Env, p):
         assert str(path) == os.getenv('HOME')
+
+    h = cli.helptext()
+    # assert '--p' not in h
     cli(['--path=HOME'])
+
+def test_doc_param_parsing():
+    @command
+    def cli(flag, value):
+        '''
+        :param flg flag: Flag description
+        :param value: Give this function some value
+        :return: None
+        '''
+    h = cli.helptext()
+    assert '-f, --flag' in h
+    assert 'flg' not in h
+    assert 'param' not in h
+    assert 'return' not in h
+    assert 'None' not in h
