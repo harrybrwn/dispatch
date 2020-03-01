@@ -2,6 +2,8 @@ import os
 
 class Env:
     def __init__(self, name):
+        if name.startswith('$'):
+            name = name[1:]
         self.name = name
 
     def __get__(self, inst, owner):

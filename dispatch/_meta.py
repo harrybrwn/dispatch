@@ -40,7 +40,7 @@ class _CliMeta(ABC):
         return doc.strip(), flags
 
 
-def _parse_flags_doc(doc: str):
+def _parse_flags_doc(doc: str) -> Dict[str, Any]:
     res: Dict[str, Any] = {}
     s = doc[doc.index(':'):]
 
@@ -51,7 +51,8 @@ def _parse_flags_doc(doc: str):
             continue
 
         parsed = [l for l in line.split(':') if l]
-        names = [n for n in parsed[0].split(' ') if n]
+        names = [n for n in parsed[0].split(' ')
+                 if n and not n == 'param']
 
         if len(parsed) >= 2:
             tmpdoc = parsed[1].strip()
@@ -59,7 +60,7 @@ def _parse_flags_doc(doc: str):
             tmpdoc = ''
 
         if len(names) == 2:
-            res[names[1].replace('-', '_')] = {'doc': tmpdoc, 'shorthand': names[0]}
+            res[names[1].replace('-', '_')] = {'doc': tmpdoc, 'shorthand': names[0][0]}
         else:
             res[names[0].replace('-', '_')] = {'doc': tmpdoc, 'shorthand': None}
     return res

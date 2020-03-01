@@ -179,7 +179,10 @@ class SubCommand(Command):
     def usage(self):
         if self.group is None:
             return self._usage
-        return f'{self.group.name} {self._usage}'
+        elif self._usage.startswith(self.group.name):
+            return self._usage
+        else:
+            return f'{self.group.name} {self._usage}'
 
 
 class Group(_CliBase):
@@ -271,18 +274,19 @@ class Group(_CliBase):
 
         cmd = self.parse_args(argv)
 
-        # if the command is callable and no arguments are given,
-        # we dont want to trigger the help message.
-        if callable(self.inst):
-            self.inst()
-            if cmd is None:
-                return
+        if callable(self.inst) and cmd is None:
+            ret = self.inst()
         elif cmd is None:
             if not self.silent:
                 self.help()
             sys.exit(1)
+        else:
+            ret = cmd(self.args)
 
-        return cmd(self.args)
+        if isinstance(ret, int):
+            sys.exit(ret)
+        else:
+            return ret
 
     # this is only really used while testing
     def _reset(self):
