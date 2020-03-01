@@ -43,7 +43,6 @@ def testGroupInit():
 
     g = Group(C)
     assert isinstance(g.type, type)
-    assert isinstance(g.inst, g.type)
     assert not C.a_value
     g([])
     assert C.a_value
@@ -204,6 +203,7 @@ def test_group_init():
             assert three == 3
 
 def test_group_init_fail_2():
+    pytest.skip('no longer applicable')
     with pytest.raises(TypeError):
         @command
         class cmd:
@@ -273,8 +273,7 @@ def test_group_err(capsys):
     class cmd:
         verbose: bool
 
-    with raises(TypeError):
-        cmd([])
+    cmd([])
 
     sys.exit = sysexit
     hlp = cmd.helptext()
@@ -372,6 +371,7 @@ def test_classmethod_subcommand():
     cmd(['inner', '--a-flag="oh yes"'])
 
 def test_flags_in_init():
+    # pytest.skip('this is still broken')
     # TODO: the command decorator will call __init__ before the Group knows about the flags that are from
     # annotations. This test will always fail if this is not fixed
     @command
@@ -383,3 +383,10 @@ def test_flags_in_init():
             assert self.path == 'the/other/correct/path'
     cmd(['--path', 'the/correct/path'])
     cmd(['subcmd', '--path', 'the/other/correct/path'])
+
+def test_stuff():
+    class cmd:
+        verbose: bool
+        value: float
+    print(dir(cmd()))
+    # print(cmd.__annotations__)

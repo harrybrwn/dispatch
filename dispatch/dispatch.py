@@ -203,15 +203,10 @@ class Group(_CliBase):
         super().__init__(**kwrgs)
         self._usage = kwrgs.pop('usage', None)
         self.silent = kwrgs.pop('silent', False)
+        self.init = kwrgs.pop('init', dict())
 
         if isinstance(obj, type):
-            init = kwrgs.pop('init', dict())
-            try:
-                self.inst = obj(**init)
-            except TypeError:
-                raise TypeError(
-                    f"""can't call __init__ for a {obj.__name__},
-        try passing the 'init' dict as an argument to @command.""")
+            self.inst = None
             self.type = obj
         else:
             self.inst = obj
@@ -229,7 +224,7 @@ class Group(_CliBase):
             if isinstance(c, SubCommand) and c.hidden:
                 self._hidden.add(c.name)
 
-        self._meta = _GroupMeta(self.inst)
+        self._meta = _GroupMeta(self.type)
         self._help = kwrgs.pop('help', self._meta.helpstr)
         self.flags = FlagSet(
             names=tuple(self._meta.flagnames()),
@@ -272,6 +267,13 @@ class Group(_CliBase):
             elif argv[0] == '-h':
                 return self.help()
 
+        try:
+            self.inst = self.type(**self.init)
+        except TypeError:
+            raise TypeError(
+                f"""can't call __init__ for a {self.type.__name__},
+        try passing the 'init' dict as an argument to @command.""")
+
         cmd = self.parse_args(argv)
 
         if callable(self.inst) and cmd is None:
@@ -279,6 +281,7 @@ class Group(_CliBase):
         elif cmd is None:
             if not self.silent:
                 self.help()
+            ret = None  # my tests monkey patch the exit function
             sys.exit(1)
         else:
             ret = cmd(self.args)

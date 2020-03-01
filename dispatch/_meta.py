@@ -183,7 +183,8 @@ class _GroupMeta(_CliMeta):
         for name, attr in attrs.items():
             if (
                 not name.startswith('_') and
-                not _isfunc(attr)
+                not _isfunc(attr) and
+                not isinstance(attr, _CliBase)  # for subcommands
             ):
                 self._annotations[name] = type(attr)
                 self._defaults[name] = attr
