@@ -248,6 +248,11 @@ class Group(_CliBase):
                 flag._value = val
             object.__setattr__(this, name, val)
 
+        # This is a no-op but I left it here for future shenanigans
+        def new_new(this, *args, **kwrgs):
+            return super(self.type, this).__new__(this)
+
+        self.type.__new__ = new_new
         self.type.__getattr__ = new_getattr
         self.type.__setattr__ = new_setattr
 
@@ -274,7 +279,9 @@ class Group(_CliBase):
                 f"""can't call __init__ for a {self.type.__name__},
         try passing the 'init' dict as an argument to @command.""")
 
-        cmd = self.parse_args(argv)
+        cmd, cur_flags = self.parse_args(argv)
+        for name, val in cur_flags.items():
+            setattr(self.inst, name, val)
 
         if callable(self.inst) and cmd is None:
             ret = self.inst()
@@ -284,7 +291,7 @@ class Group(_CliBase):
             ret = None  # my tests monkey patch the exit function
             sys.exit(1)
         else:
-            ret = cmd(self.args)
+            ret = cmd(argv=self.args)
 
         if isinstance(ret, int):
             sys.exit(ret)
@@ -313,9 +320,10 @@ class Group(_CliBase):
             return fn
         return SubCommand(fn, __instance__=self.inst, __command_group__=self)
 
-    def parse_args(self, args: List[str]) -> Optional[SubCommand]:
+    def parse_args(self, args: List[str]):  # -> Optional[SubCommand]:
         # TODO: add support for multiple flag shorthands (-vxcf instead of -v -x -c -f)
         nextcmd = None
+        flags = {}
         while args:
             # Need to find either a command or a flag
             # otherwise, add an argument an move on.
@@ -349,8 +357,9 @@ class Group(_CliBase):
                 continue
 
             self._setflag_from_args(args, arg, val, flag)
-            setattr(self.inst, flag.name, flag.value)
-        return nextcmd
+            flags[flag.name] = flag.value
+            # setattr(self.inst, flag.name, flag.value)
+        return nextcmd, flags
 
     # TODO: this is a totol mess, please, someone fix this.
     def _command_help(self) -> Optional[str]:
