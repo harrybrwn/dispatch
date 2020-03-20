@@ -35,9 +35,9 @@ class _CliBase:
 
     @staticmethod
     def process_arg(raw) -> Tuple[str, Any]:
-        arg = raw.lstrip('-').replace('-', '_')
+        arg = raw.lstrip('-')
         arg, _, val = arg.partition('=')
-        return arg, val or None
+        return arg.replace('-', '_'), val or None
 
     def helptext(self, template=None):
         if self.doc_help:

@@ -309,3 +309,12 @@ def test_doc_param_parsing():
     assert 'param' not in h
     assert 'return' not in h
     assert 'None' not in h
+
+def test_flag_value_with_dash():
+    @command
+    def cli(path: str):
+        assert '_' not in path
+
+    cli(['--path=this/is-a/path-with-dashes'])
+    cli(['--path', 'this/is-a/path-with-dashes'])
+    cli(['--path=--this/is-a-very-strange/path-name'])

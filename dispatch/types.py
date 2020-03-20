@@ -22,7 +22,7 @@ class Env:
         return bool(self._get())
 
     def _get(self) -> str:
-        return os.getenv(self.name) or ''
+        return os.getenv(str(self.name)) or self.name
 
 # TODO: when used as an annotaion, should accept json input
 # and convert to dict
