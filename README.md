@@ -1,4 +1,5 @@
 # dispatch
+[![pypi](https://img.shields.io/pypi/v/py-dispatch.svg)](https://pypi.python.org/pypi/py-dispatch)
 
 A low information-redundancy CLI framework for a quick and dirty way of converting python a script to a command line tool.
 
@@ -164,14 +165,14 @@ python multicommand.py --help
 Usage:
     multicommand [options] [command]
 
+Commands:
+    cat   Print a file
+    do    Do a thing
+
 Options:
         --filename   default: 'README.md'
     -v, --verbose    print stuff verbosly
     -h, --help       Get help.
-
-Commands:
-    cat   Print a file
-    do    Do a thing
 ```
 
 Group Flags

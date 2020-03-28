@@ -10,17 +10,16 @@ HELP_TMPL = '''{%- if main_doc -%}
 {% endif -%}
 Usage:
     {{ usage }}
-
-Options:
-{%- for flg in flags %}
-    {{ '{}'.format(flg) }}
-{%- endfor -%}
-
-{% if command_help %}
+{%- if command_help %}
 
 Commands:
 {{ command_help }}
 {%- endif %}
+
+Options:
+{%- for flg in flags %}
+    {{ '{}'.format(flg) }}
+{%- endfor%}
 '''
 
 
